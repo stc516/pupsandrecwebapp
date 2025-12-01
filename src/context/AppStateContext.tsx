@@ -1,0 +1,306 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  type ReactNode,
+} from 'react';
+import { nanoid } from 'nanoid';
+import { addDays, parseISO, startOfDay } from 'date-fns';
+
+import { activities as seedActivities } from '../data/activities';
+import { achievements as achievementCatalog } from '../data/achievements';
+import { journalEntries as seedJournal } from '../data/journal';
+import { pets as seedPets } from '../data/pets';
+import { reminders as seedReminders } from '../data/reminders';
+import type {
+  AchievementProgress,
+  Activity,
+  HealthRecord,
+  JournalEntry,
+  Pet,
+  PetId,
+  PreferencesState,
+  Reminder,
+} from '../types';
+import { getXpForActivity, hasPhoto, XP_PER_JOURNAL_ENTRY } from '../utils/xp';
+
+const STORAGE_KEY = 'pups-rec-state-v1';
+
+interface AppState {
+  pets: Pet[];
+  selectedPetId: PetId;
+  activities: Activity[];
+  journalEntries: JournalEntry[];
+  reminders: Reminder[];
+  achievements: AchievementProgress[];
+  xp: number;
+  preferences: PreferencesState;
+}
+
+const defaultPreferences: PreferencesState = {
+  email: 'maggie@pupsandrec.com',
+  dailyReminders: true,
+  activityNotifications: true,
+  profileVisibility: true,
+  shareDataWithFriends: false,
+};
+
+const buildAchievementState = (): AchievementProgress[] =>
+  achievementCatalog.map((achievement) => ({
+    ...achievement,
+    unlocked: false,
+    progress: 0,
+  }));
+
+type Action =
+  | { type: 'set-selected-pet'; payload: PetId }
+  | { type: 'add-activity'; payload: Activity }
+  | { type: 'add-journal-entry'; payload: JournalEntry }
+  | { type: 'add-reminder'; payload: Reminder }
+  | { type: 'add-health-record'; payload: { petId: PetId; record: HealthRecord } }
+  | { type: 'grant-xp'; payload: number }
+  | { type: 'update-preferences'; payload: Partial<PreferencesState> };
+
+const sortActivities = (items: Activity[]) =>
+  [...items].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+const sortJournal = (items: JournalEntry[]) =>
+  [...items].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+const baseState: AppState = {
+  pets: seedPets,
+  selectedPetId: seedPets[0]?.id ?? 'bailey',
+  activities: sortActivities(seedActivities),
+  journalEntries: sortJournal(seedJournal),
+  reminders: seedReminders,
+  achievements: buildAchievementState(),
+  xp: 120,
+  preferences: defaultPreferences,
+};
+
+const addAchievementXp = (state: AppState) => {
+  let xpBonus = 0;
+  const updated = state.achievements.map((achievement) => {
+    const progress = calculateProgress(achievement, state);
+    const unlocked = progress >= achievement.threshold;
+    const unlockedAt = unlocked
+      ? achievement.unlockedAt ?? new Date().toISOString()
+      : achievement.unlockedAt;
+    if (unlocked && !achievement.unlocked) {
+      xpBonus += achievement.xpReward;
+    }
+    return {
+      ...achievement,
+      progress: Math.min(progress, achievement.threshold),
+      unlocked,
+      unlockedAt,
+    };
+  });
+
+  if (xpBonus > 0) {
+    return { ...state, xp: state.xp + xpBonus, achievements: updated };
+  }
+
+  return { ...state, achievements: updated };
+};
+
+const calculateProgress = (achievement: AchievementProgress, state: AppState) => {
+  switch (achievement.conditionType) {
+    case 'first-walk':
+      return state.activities.filter((activity) => activity.type === 'walk').length;
+    case 'journal-count':
+      return state.journalEntries.length;
+    case 'activities-count': {
+      const sevenDaysAgo = addDays(new Date(), -6);
+      return state.activities.filter((activity) => new Date(activity.date) >= sevenDaysAgo).length;
+    }
+    case 'photos-uploaded': {
+      const activityPhotos = state.activities.filter(hasPhoto).length;
+      const journalPhotos = state.journalEntries.filter(hasPhoto).length;
+      return activityPhotos + journalPhotos;
+    }
+    case 'consecutive-days': {
+      const sorted = sortActivities(state.activities);
+      let streak = 0;
+      let longest = 0;
+      let lastDate: Date | null = null;
+      sorted.forEach((activity) => {
+        const activityDate = startOfDay(parseISO(activity.date));
+        if (!lastDate) {
+          streak = 1;
+        } else {
+          const diff = lastDate.getTime() - activityDate.getTime();
+          const dayDiff = diff / (1000 * 60 * 60 * 24);
+          if (dayDiff === 0) {
+            return; // multiple activities same day
+          }
+          if (dayDiff === 1) {
+            streak += 1;
+          } else {
+            streak = 1;
+          }
+        }
+        lastDate = activityDate;
+        longest = Math.max(longest, streak);
+      });
+      return longest || streak;
+    }
+    default:
+      return 0;
+  }
+};
+
+const loadPersistedState = (): AppState | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as AppState;
+    const merged = {
+      ...baseState,
+      ...parsed,
+      achievements: parsed.achievements ?? baseState.achievements,
+    };
+    return merged;
+  } catch (error) {
+    console.warn('Failed to parse saved state', error);
+    return null;
+  }
+};
+
+const reducer = (state: AppState, action: Action): AppState => {
+  switch (action.type) {
+    case 'set-selected-pet':
+      return { ...state, selectedPetId: action.payload };
+    case 'add-activity': {
+      const updatedState = {
+        ...state,
+        activities: sortActivities([action.payload, ...state.activities]),
+        xp: state.xp + getXpForActivity(action.payload.type),
+      };
+      return addAchievementXp(updatedState);
+    }
+    case 'add-journal-entry': {
+      const updatedState = {
+        ...state,
+        journalEntries: sortJournal([action.payload, ...state.journalEntries]),
+        xp: state.xp + XP_PER_JOURNAL_ENTRY,
+      };
+      return addAchievementXp(updatedState);
+    }
+    case 'add-reminder':
+      return {
+        ...state,
+        reminders: [action.payload, ...state.reminders],
+      };
+    case 'add-health-record':
+      return {
+        ...state,
+        pets: state.pets.map((pet) =>
+          pet.id === action.payload.petId
+            ? { ...pet, healthRecords: [action.payload.record, ...pet.healthRecords] }
+            : pet,
+        ),
+      };
+    case 'grant-xp': {
+      const updatedState = { ...state, xp: state.xp + action.payload };
+      return addAchievementXp(updatedState);
+    }
+    case 'update-preferences':
+      return {
+        ...state,
+        preferences: { ...state.preferences, ...action.payload },
+      };
+    default:
+      return state;
+  }
+};
+
+interface AppStateContextValue extends AppState {
+  selectedPet?: Pet;
+  setSelectedPet: (petId: PetId) => void;
+  addActivity: (payload: Omit<Activity, 'id'>) => void;
+  addJournalEntry: (payload: Omit<JournalEntry, 'id'>) => void;
+  addReminder: (payload: Omit<Reminder, 'id'>) => void;
+  addHealthRecord: (payload: { petId: PetId; record: Omit<HealthRecord, 'id'> }) => void;
+  completeActionAndGrantXP: (xp: number) => void;
+  updatePreferences: (prefs: Partial<PreferencesState>) => void;
+}
+
+const AppStateContext = createContext<AppStateContextValue | undefined>(undefined);
+
+export const AppStateProvider = ({ children }: { children: ReactNode }) => {
+  const persisted = loadPersistedState();
+  const startingState = addAchievementXp(persisted ?? baseState);
+  const [state, dispatch] = useReducer(reducer, startingState);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }, [state]);
+
+  const setSelectedPet = useCallback((petId: PetId) => {
+    dispatch({ type: 'set-selected-pet', payload: petId });
+  }, []);
+
+  const addActivity = useCallback((payload: Omit<Activity, 'id'>) => {
+    dispatch({ type: 'add-activity', payload: { ...payload, id: nanoid() } });
+  }, []);
+
+  const addJournalEntry = useCallback((payload: Omit<JournalEntry, 'id'>) => {
+    dispatch({ type: 'add-journal-entry', payload: { ...payload, id: nanoid() } });
+  }, []);
+
+  const addReminder = useCallback((payload: Omit<Reminder, 'id'>) => {
+    dispatch({ type: 'add-reminder', payload: { ...payload, id: nanoid() } });
+  }, []);
+
+  const addHealthRecord = useCallback(
+    (payload: { petId: PetId; record: Omit<HealthRecord, 'id'> }) => {
+      dispatch({
+        type: 'add-health-record',
+        payload: {
+          petId: payload.petId,
+          record: { ...payload.record, id: nanoid() },
+        },
+      });
+    },
+    [],
+  );
+
+  const completeActionAndGrantXP = useCallback((xp: number) => {
+    dispatch({ type: 'grant-xp', payload: xp });
+  }, []);
+
+  const updatePreferences = useCallback((prefs: Partial<PreferencesState>) => {
+    dispatch({ type: 'update-preferences', payload: prefs });
+  }, []);
+
+  const value = useMemo<AppStateContextValue>(() => {
+    const selectedPet = state.pets.find((pet) => pet.id === state.selectedPetId);
+    return {
+      ...state,
+      selectedPet,
+      setSelectedPet,
+      addActivity,
+      addJournalEntry,
+      addReminder,
+      addHealthRecord,
+      completeActionAndGrantXP,
+      updatePreferences,
+    };
+  }, [state, setSelectedPet, addActivity, addJournalEntry, addReminder, addHealthRecord, completeActionAndGrantXP, updatePreferences]);
+
+  return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
+};
+
+export const useAppStateContext = () => {
+  const context = useContext(AppStateContext);
+  if (!context) {
+    throw new Error('useAppStateContext must be used within AppStateProvider');
+  }
+  return context;
+};
