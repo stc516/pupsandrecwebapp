@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Filter, PenSquare, Tags } from 'lucide-react';
+import { Filter, PenSquare, Tags, Trash2, Pencil } from 'lucide-react';
 import clsx from 'clsx';
 
 import { Card } from '../../components/ui/Card';
@@ -16,7 +16,14 @@ const categories = ['Walk', 'Health', 'Training', 'Play', 'Other'] as const;
 type JournalCategory = (typeof categories)[number];
 
 export const JournalPage = () => {
-  const { journalEntries, selectedPetId, pets, addJournalEntry } = useAppState();
+  const {
+    journalEntries,
+    selectedPetId,
+    pets,
+    addJournalEntry,
+    updateJournalEntry,
+    deleteJournalEntry,
+  } = useAppState();
   const { pushToast } = useToast();
   const [filters, setFilters] = useState({ pet: selectedPetId ?? 'all', category: 'all', tag: '' });
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -29,6 +36,16 @@ export const JournalPage = () => {
     photoUrl: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editState, setEditState] = useState({
+    title: '',
+    date: new Date().toISOString().slice(0, 10),
+    content: '',
+    tags: '',
+    category: 'Walk' as JournalCategory,
+    photoUrl: '',
+  });
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setFilters((prev) => ({ ...prev, pet: selectedPetId ?? 'all' }));
@@ -49,18 +66,18 @@ export const JournalPage = () => {
       hasError && 'border-red-300 focus-visible:outline-red-400',
     );
 
-  const validateForm = () => {
+  const validateForm = (stateToValidate: typeof formState) => {
     const nextErrors: Record<string, string> = {};
-    if (!formState.title.trim()) {
+    if (!stateToValidate.title.trim()) {
       nextErrors.title = 'Give your entry a title.';
     }
-    if (!formState.content.trim()) {
+    if (!stateToValidate.content.trim()) {
       nextErrors.content = 'Share a few thoughts.';
     }
-    if (!formState.date) {
+    if (!stateToValidate.date) {
       nextErrors.date = 'Pick a date.';
     }
-    if (formState.photoUrl && !isValidUrl(formState.photoUrl)) {
+    if (stateToValidate.photoUrl && !isValidUrl(stateToValidate.photoUrl)) {
       nextErrors.photoUrl = 'Enter a valid URL.';
     }
     return nextErrors;
@@ -69,7 +86,7 @@ export const JournalPage = () => {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedPetId) return;
-    const nextErrors = validateForm();
+    const nextErrors = validateForm(formState);
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       pushToast({ tone: 'error', message: 'Fix the highlighted fields before saving.' });
@@ -90,6 +107,58 @@ export const JournalPage = () => {
     setFormState((prev) => ({ ...prev, title: '', content: '', tags: '', photoUrl: '' }));
     setErrors({});
     pushToast({ tone: 'success', message: 'Journal entry saved.' });
+  };
+
+  const startEditingEntry = (entryId: string) => {
+    const entry = journalEntries.find((item) => item.id === entryId);
+    if (!entry) return;
+    setEditingEntryId(entryId);
+    setEditErrors({});
+    setEditState({
+      title: entry.title,
+      date: entry.date.slice(0, 10),
+      content: entry.content,
+      tags: entry.tags.join(', '),
+      category: entry.category,
+      photoUrl: entry.photoUrl ?? '',
+    });
+  };
+
+  const handleEditSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingEntryId) return;
+    const nextErrors = validateForm(editState);
+    if (Object.keys(nextErrors).length > 0) {
+      setEditErrors(nextErrors);
+      pushToast({ tone: 'error', message: 'Fix highlighted fields before saving.' });
+      return;
+    }
+    updateJournalEntry({
+      id: editingEntryId,
+      updates: {
+        title: editState.title,
+        date: new Date(editState.date).toISOString(),
+        content: editState.content,
+        tags: editState.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        category: editState.category,
+        photoUrl: editState.photoUrl,
+      },
+    });
+    setEditingEntryId(null);
+    pushToast({ tone: 'success', message: 'Journal entry updated.' });
+  };
+
+  const handleDeleteEntry = (entryId: string) => {
+    if (!window.confirm('Delete this journal entry?')) return;
+    deleteJournalEntry(entryId);
+    if (editingEntryId === entryId) {
+      setEditingEntryId(null);
+      setEditErrors({});
+    }
+    pushToast({ tone: 'success', message: 'Entry deleted.' });
   };
 
   return (
@@ -143,16 +212,34 @@ export const JournalPage = () => {
           </div>
           <div className="mt-6 space-y-4">
             {filteredEntries.map((entry) => (
-              <div key={entry.id} className="rounded-3xl border border-brand-border p-4">
-                <div className="flex items-center justify-between">
+              <div key={entry.id} className="space-y-3 rounded-3xl border border-brand-border p-4">
+                <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-brand-primary">{entry.title}</p>
                     <p className="text-xs text-text-muted">{formatDate(entry.date)}</p>
                   </div>
-                  <TagChip>{entry.category}</TagChip>
+                  <div className="flex items-center gap-2">
+                    <TagChip>{entry.category}</TagChip>
+                    <button
+                      type="button"
+                      onClick={() => startEditingEntry(entry.id)}
+                      className="inline-flex items-center gap-1 rounded-full border border-brand-border px-2.5 py-1 text-xs font-semibold text-brand-primary"
+                    >
+                      <Pencil size={12} />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteEntry(entry.id)}
+                      className="inline-flex items-center gap-1 rounded-full border border-red-100 px-2.5 py-1 text-xs font-semibold text-red-600"
+                    >
+                      <Trash2 size={12} />
+                      Delete
+                    </button>
+                  </div>
                 </div>
-                <p className="mt-3 text-sm text-text-secondary">{entry.content}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <p className="text-sm text-text-secondary">{entry.content}</p>
+                <div className="flex flex-wrap gap-2">
                   {entry.tags.map((tag) => (
                     <TagChip key={tag} variant="accent">
                       #{tag}
@@ -166,6 +253,92 @@ export const JournalPage = () => {
             )}
           </div>
         </Card>
+        {editingEntryId && (
+          <Card padding="lg">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-brand-primary">Edit Entry</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingEntryId(null);
+                  setEditErrors({});
+                }}
+                className="text-sm font-semibold text-text-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+            <form className="mt-4 space-y-4" onSubmit={handleEditSubmit}>
+              <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                Title
+                <input
+                  className={fieldClasses(Boolean(editErrors.title))}
+                  value={editState.title}
+                  onChange={(event) => setEditState((prev) => ({ ...prev, title: event.target.value }))}
+                  aria-invalid={Boolean(editErrors.title)}
+                />
+                {editErrors.title && <p className="mt-1 text-xs text-red-500">{editErrors.title}</p>}
+              </label>
+              <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                Date
+                <input
+                  type="date"
+                  className={fieldClasses(Boolean(editErrors.date))}
+                  value={editState.date}
+                  onChange={(event) => setEditState((prev) => ({ ...prev, date: event.target.value }))}
+                  aria-invalid={Boolean(editErrors.date)}
+                />
+                {editErrors.date && <p className="mt-1 text-xs text-red-500">{editErrors.date}</p>}
+              </label>
+              <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                Thoughts
+                <textarea
+                  rows={5}
+                  className={fieldClasses(Boolean(editErrors.content))}
+                  value={editState.content}
+                  onChange={(event) => setEditState((prev) => ({ ...prev, content: event.target.value }))}
+                  aria-invalid={Boolean(editErrors.content)}
+                />
+                {editErrors.content && <p className="mt-1 text-xs text-red-500">{editErrors.content}</p>}
+              </label>
+              <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                Tags (comma separated)
+                <input
+                  className={fieldClasses(false)}
+                  value={editState.tags}
+                  onChange={(event) => setEditState((prev) => ({ ...prev, tags: event.target.value }))}
+                />
+              </label>
+              <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                Category
+                <select
+                  className={fieldClasses(false)}
+                  value={editState.category}
+                  onChange={(event) =>
+                    setEditState((prev) => ({ ...prev, category: event.target.value as JournalCategory }))
+                  }
+                >
+                  {categories.map((category) => (
+                    <option key={category}>{category}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                Photo URL
+                <input
+                  className={fieldClasses(Boolean(editErrors.photoUrl))}
+                  value={editState.photoUrl}
+                  onChange={(event) => setEditState((prev) => ({ ...prev, photoUrl: event.target.value }))}
+                  aria-invalid={Boolean(editErrors.photoUrl)}
+                />
+                {editErrors.photoUrl && <p className="mt-1 text-xs text-red-500">{editErrors.photoUrl}</p>}
+              </label>
+              <PrimaryButton type="submit" startIcon={<PenSquare size={16} />}>
+                Save changes
+              </PrimaryButton>
+            </form>
+          </Card>
+        )}
         <Card padding="lg">
           <h3 className="text-lg font-semibold text-brand-primary">Add New Entry</h3>
           <form className="mt-4 space-y-4" onSubmit={handleSubmit}>

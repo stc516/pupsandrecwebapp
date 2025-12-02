@@ -21,6 +21,12 @@ body {
   margin: 0;
   min-height: 100vh;
   background-color: #f3f4f8;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(47, 115, 255, 0.12), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(255, 230, 219, 0.35), transparent 55%),
+    linear-gradient(180deg, rgba(247, 250, 255, 0.9), rgba(243, 244, 248, 0.9));
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   padding-left: var(--safe-area-left);
   padding-right: var(--safe-area-right);
 }

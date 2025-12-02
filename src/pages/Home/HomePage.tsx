@@ -42,13 +42,13 @@ export const HomePage = () => {
       actions={<Link to="/activity" className="text-sm font-semibold text-brand-primary">Start an activity</Link>}
     >
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="flex flex-col gap-4" padding="lg">
+        <Card className="flex flex-col gap-4 border-0 bg-gradient-to-br from-brand-accent to-brand-accentDeep text-white shadow-xl" padding="lg">
           <div className="flex items-center gap-3">
             <img src={petAvatar} alt={selectedPet?.name} className="h-16 w-16 rounded-2xl object-cover" />
             <div>
-              <p className="text-sm text-text-muted">Daily Summary</p>
-              <h3 className="text-xl font-semibold text-brand-primary">{petName}&apos;s Agenda</h3>
-              <p className="text-sm text-text-secondary">Walks, meals, and mood all in one place.</p>
+              <p className="text-sm text-brand-accentSoft/80">Daily Summary</p>
+              <h3 className="text-2xl font-semibold text-white">{petName}&apos;s Agenda</h3>
+              <p className="text-sm text-white/80">Walks, meals, and mood all in one place.</p>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -62,7 +62,7 @@ export const HomePage = () => {
             <StatPill label="Total XP" value={`${xp} XP`} icon={<Heart size={18} />} accent="emerald" />
           </div>
         </Card>
-        <Card padding="lg">
+        <Card padding="lg" className="border-0 bg-brand-ice/50">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-brand-primary">Quick Actions</h3>
             <PawPrint className="text-brand-accent" />
@@ -83,7 +83,7 @@ export const HomePage = () => {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="md:col-span-2" padding="lg">
+        <Card className="md:col-span-2 border-0 bg-white/90 shadow-lg" padding="lg">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">Recent Activity</h3>
             <Link to="/activity" className="text-sm font-semibold text-brand-primary">
@@ -112,7 +112,7 @@ export const HomePage = () => {
             )}
           </div>
         </Card>
-        <Card padding="lg">
+        <Card padding="lg" className="border-0 bg-brand-blush/50">
           <h3 className="text-lg font-semibold text-brand-primary">Latest Journal</h3>
           {lastJournalEntry ? (
             <div className="mt-3 rounded-2xl bg-brand-subtle p-4">

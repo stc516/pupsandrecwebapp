@@ -1,7 +1,7 @@
 import { addMonths, subMonths } from 'date-fns';
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, Pencil, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 
 import { Card } from '../../components/ui/Card';
@@ -16,7 +16,13 @@ const reminderTypes = ['walk', 'vet-appointment', 'medication', 'grooming', 'oth
 type ReminderType = (typeof reminderTypes)[number];
 
 export const CalendarPage = () => {
-  const { reminders, selectedPetId, addReminder } = useAppState();
+  const {
+    reminders,
+    selectedPetId,
+    addReminder,
+    updateReminder,
+    deleteReminder,
+  } = useAppState();
   const { pushToast } = useToast();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -26,6 +32,13 @@ export const CalendarPage = () => {
     dateTime: new Date().toISOString().slice(0, 16),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [editingReminderId, setEditingReminderId] = useState<string | null>(null);
+  const [editState, setEditState] = useState({
+    type: 'walk' as ReminderType,
+    title: '',
+    dateTime: new Date().toISOString().slice(0, 16),
+  });
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
   const monthMatrix = useMemo(() => buildMonthMatrix(currentMonth), [currentMonth]);
   const dayReminders = reminders.filter(
@@ -38,12 +51,12 @@ export const CalendarPage = () => {
       hasError && 'border-red-300 focus-visible:outline-red-400',
     );
 
-  const validateForm = () => {
+  const validateForm = (stateToValidate: typeof formState | typeof editState) => {
     const nextErrors: Record<string, string> = {};
-    if (!formState.title.trim()) {
+    if (!stateToValidate.title.trim()) {
       nextErrors.title = 'Give the reminder a title.';
     }
-    if (!formState.dateTime) {
+    if (!stateToValidate.dateTime) {
       nextErrors.dateTime = 'Pick a date and time.';
     }
     return nextErrors;
@@ -52,7 +65,7 @@ export const CalendarPage = () => {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedPetId) return;
-    const nextErrors = validateForm();
+    const nextErrors = validateForm(formState);
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       pushToast({ tone: 'error', message: 'Please fix the highlighted fields.' });
@@ -67,6 +80,49 @@ export const CalendarPage = () => {
     setFormState((prev) => ({ ...prev, title: '' }));
     setErrors({});
     pushToast({ tone: 'success', message: 'Reminder added.' });
+  };
+
+  const startEditingReminder = (reminderId: string) => {
+    const reminder = reminders.find((item) => item.id === reminderId);
+    if (!reminder) return;
+    setEditingReminderId(reminderId);
+    setEditErrors({});
+    setEditState({
+      type: reminder.type,
+      title: reminder.title,
+      dateTime: reminder.dateTime.slice(0, 16),
+    });
+  };
+
+  const handleEditSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingReminderId) return;
+    const nextErrors = validateForm(editState);
+    if (Object.keys(nextErrors).length > 0) {
+      setEditErrors(nextErrors);
+      pushToast({ tone: 'error', message: 'Fix highlighted fields before saving.' });
+      return;
+    }
+    updateReminder({
+      id: editingReminderId,
+      updates: {
+        type: editState.type,
+        title: editState.title,
+        dateTime: new Date(editState.dateTime).toISOString(),
+      },
+    });
+    setEditingReminderId(null);
+    pushToast({ tone: 'success', message: 'Reminder updated.' });
+  };
+
+  const handleDeleteReminder = (reminderId: string) => {
+    if (!window.confirm('Delete this reminder?')) return;
+    deleteReminder(reminderId);
+    if (editingReminderId === reminderId) {
+      setEditingReminderId(null);
+      setEditErrors({});
+    }
+    pushToast({ tone: 'success', message: 'Reminder deleted.' });
   };
 
   return (
@@ -138,13 +194,33 @@ export const CalendarPage = () => {
             <div className="mt-3 space-y-3">
               {dayReminders.map((reminder) => (
                 <div key={reminder.id} className="rounded-2xl border border-brand-border p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-brand-primary">{reminder.title}</p>
-                    <TagChip>{reminder.type}</TagChip>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-brand-primary">{reminder.title}</p>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-text-secondary">
+                        <Clock size={14} /> {formatTime(reminder.dateTime)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <TagChip>{reminder.type}</TagChip>
+                      <button
+                        type="button"
+                        onClick={() => startEditingReminder(reminder.id)}
+                        className="inline-flex items-center gap-1 rounded-full border border-brand-border px-2.5 py-1 text-xs font-semibold text-brand-primary"
+                      >
+                        <Pencil size={12} />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteReminder(reminder.id)}
+                        className="inline-flex items-center gap-1 rounded-full border border-red-100 px-2.5 py-1 text-xs font-semibold text-red-600"
+                      >
+                        <Trash2 size={12} />
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <p className="mt-1 flex items-center gap-1 text-sm text-text-secondary">
-                    <Clock size={14} /> {formatTime(reminder.dateTime)}
-                  </p>
                 </div>
               ))}
               {dayReminders.length === 0 && (
@@ -152,6 +228,61 @@ export const CalendarPage = () => {
               )}
             </div>
           </Card>
+          {editingReminderId && (
+            <Card padding="lg">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-brand-primary">Edit Reminder</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingReminderId(null);
+                    setEditErrors({});
+                  }}
+                  className="text-sm font-semibold text-text-secondary"
+                >
+                  Cancel
+                </button>
+              </div>
+              <form className="mt-4 space-y-4" onSubmit={handleEditSubmit}>
+                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                  Title
+                  <input
+                    className={fieldClasses(Boolean(editErrors.title))}
+                    value={editState.title}
+                    onChange={(event) => setEditState((prev) => ({ ...prev, title: event.target.value }))}
+                    aria-invalid={Boolean(editErrors.title)}
+                  />
+                  {editErrors.title && <p className="mt-1 text-xs text-red-500">{editErrors.title}</p>}
+                </label>
+                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                  Type
+                  <select
+                    className={fieldClasses(false)}
+                    value={editState.type}
+                    onChange={(event) =>
+                      setEditState((prev) => ({ ...prev, type: event.target.value as ReminderType }))
+                    }
+                  >
+                    {reminderTypes.map((type) => (
+                      <option key={type}>{type}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                  When
+                  <input
+                    type="datetime-local"
+                    className={fieldClasses(Boolean(editErrors.dateTime))}
+                    value={editState.dateTime}
+                    onChange={(event) => setEditState((prev) => ({ ...prev, dateTime: event.target.value }))}
+                    aria-invalid={Boolean(editErrors.dateTime)}
+                  />
+                  {editErrors.dateTime && <p className="mt-1 text-xs text-red-500">{editErrors.dateTime}</p>}
+                </label>
+                <PrimaryButton type="submit" startIcon={<CalendarDays size={16} />}>Save changes</PrimaryButton>
+              </form>
+            </Card>
+          )}
           <Card padding="lg">
             <h3 className="text-lg font-semibold text-brand-primary">Add Reminder</h3>
             <form className="mt-4 space-y-4" onSubmit={handleSubmit}>

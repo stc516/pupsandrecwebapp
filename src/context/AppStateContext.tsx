@@ -58,9 +58,20 @@ const buildAchievementState = (): AchievementProgress[] =>
 type Action =
   | { type: 'set-selected-pet'; payload: PetId }
   | { type: 'add-activity'; payload: Activity }
+  | { type: 'update-activity'; payload: { id: string; updates: Partial<Omit<Activity, 'id'>> } }
+  | { type: 'delete-activity'; payload: { id: string } }
   | { type: 'add-journal-entry'; payload: JournalEntry }
+  | { type: 'update-journal-entry'; payload: { id: string; updates: Partial<Omit<JournalEntry, 'id'>> } }
+  | { type: 'delete-journal-entry'; payload: { id: string } }
   | { type: 'add-reminder'; payload: Reminder }
+  | { type: 'update-reminder'; payload: { id: string; updates: Partial<Omit<Reminder, 'id'>> } }
+  | { type: 'delete-reminder'; payload: { id: string } }
+  | { type: 'add-pet'; payload: Pet }
+  | { type: 'update-pet'; payload: Pet }
+  | { type: 'delete-pet'; payload: PetId }
   | { type: 'add-health-record'; payload: { petId: PetId; record: HealthRecord } }
+  | { type: 'update-health-record'; payload: { petId: PetId; recordId: string; updates: Partial<Omit<HealthRecord, 'id'>> } }
+  | { type: 'delete-health-record'; payload: { petId: PetId; recordId: string } }
   | { type: 'grant-xp'; payload: number }
   | { type: 'update-preferences'; payload: Partial<PreferencesState> };
 
@@ -191,17 +202,109 @@ const reducer = (state: AppState, action: Action): AppState => {
       };
       return addAchievementXp(updatedState);
     }
+    case 'update-activity': {
+      const updatedActivities = sortActivities(
+        state.activities.map((activity) =>
+          activity.id === action.payload.id ? { ...activity, ...action.payload.updates } : activity,
+        ),
+      );
+      return addAchievementXp({
+        ...state,
+        activities: updatedActivities,
+      });
+    }
+    case 'delete-activity': {
+      const updatedActivities = state.activities.filter((activity) => activity.id !== action.payload.id);
+      return addAchievementXp({ ...state, activities: updatedActivities });
+    }
+    case 'update-journal-entry': {
+      const updatedJournal = sortJournal(
+        state.journalEntries.map((entry) =>
+          entry.id === action.payload.id ? { ...entry, ...action.payload.updates } : entry,
+        ),
+      );
+      return addAchievementXp({ ...state, journalEntries: updatedJournal });
+    }
+    case 'delete-journal-entry': {
+      const updatedJournal = state.journalEntries.filter((entry) => entry.id !== action.payload.id);
+      return addAchievementXp({ ...state, journalEntries: updatedJournal });
+    }
     case 'add-reminder':
       return {
         ...state,
         reminders: [action.payload, ...state.reminders],
       };
+    case 'update-reminder':
+      return {
+        ...state,
+        reminders: state.reminders.map((reminder) =>
+          reminder.id === action.payload.id ? { ...reminder, ...action.payload.updates } : reminder,
+        ),
+      };
+    case 'delete-reminder':
+      return {
+        ...state,
+        reminders: state.reminders.filter((reminder) => reminder.id !== action.payload.id),
+      };
+    case 'add-pet':
+      return {
+        ...state,
+        pets: [...state.pets, action.payload],
+        selectedPetId: action.payload.id,
+      };
+    case 'update-pet':
+      return {
+        ...state,
+        pets: state.pets.map((pet) => (pet.id === action.payload.id ? action.payload : pet)),
+      };
+    case 'delete-pet': {
+      const filteredPets = state.pets.filter((pet) => pet.id !== action.payload);
+      const fallbackPetId =
+        state.selectedPetId === action.payload ? filteredPets[0]?.id ?? '' : state.selectedPetId;
+      const filteredActivities = state.activities.filter((activity) => activity.petId !== action.payload);
+      const filteredJournal = state.journalEntries.filter((entry) => entry.petId !== action.payload);
+      const filteredReminders = state.reminders.filter((reminder) => reminder.petId !== action.payload);
+      return addAchievementXp({
+        ...state,
+        pets: filteredPets,
+        selectedPetId: fallbackPetId,
+        activities: filteredActivities,
+        journalEntries: filteredJournal,
+        reminders: filteredReminders,
+      });
+    }
     case 'add-health-record':
       return {
         ...state,
         pets: state.pets.map((pet) =>
           pet.id === action.payload.petId
             ? { ...pet, healthRecords: [action.payload.record, ...pet.healthRecords] }
+            : pet,
+        ),
+      };
+    case 'update-health-record':
+      return {
+        ...state,
+        pets: state.pets.map((pet) =>
+          pet.id === action.payload.petId
+            ? {
+                ...pet,
+                healthRecords: pet.healthRecords.map((record) =>
+                  record.id === action.payload.recordId ? { ...record, ...action.payload.updates } : record,
+                ),
+              }
+            : pet,
+        ),
+      };
+    case 'delete-health-record':
+      return {
+        ...state,
+        pets: state.pets.map((pet) =>
+          pet.id === action.payload.petId
+            ? {
+                ...pet,
+                healthRecords: pet.healthRecords.filter((record) => record.id !== action.payload.recordId),
+              }
             : pet,
         ),
       };
@@ -223,9 +326,24 @@ interface AppStateContextValue extends AppState {
   selectedPet?: Pet;
   setSelectedPet: (petId: PetId) => void;
   addActivity: (payload: Omit<Activity, 'id'>) => void;
+  updateActivity: (payload: { id: string; updates: Partial<Omit<Activity, 'id'>> }) => void;
+  deleteActivity: (id: string) => void;
   addJournalEntry: (payload: Omit<JournalEntry, 'id'>) => void;
+  updateJournalEntry: (payload: { id: string; updates: Partial<Omit<JournalEntry, 'id'>> }) => void;
+  deleteJournalEntry: (id: string) => void;
   addReminder: (payload: Omit<Reminder, 'id'>) => void;
+  updateReminder: (payload: { id: string; updates: Partial<Omit<Reminder, 'id'>> }) => void;
+  deleteReminder: (id: string) => void;
+  addPet: (payload: Omit<Pet, 'id'>) => void;
+  updatePet: (payload: Pet) => void;
+  deletePet: (petId: PetId) => void;
   addHealthRecord: (payload: { petId: PetId; record: Omit<HealthRecord, 'id'> }) => void;
+  updateHealthRecord: (payload: {
+    petId: PetId;
+    recordId: string;
+    updates: Partial<Omit<HealthRecord, 'id'>>;
+  }) => void;
+  deleteHealthRecord: (payload: { petId: PetId; recordId: string }) => void;
   completeActionAndGrantXP: (xp: number) => void;
   updatePreferences: (prefs: Partial<PreferencesState>) => void;
 }
@@ -258,6 +376,45 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: 'add-reminder', payload: { ...payload, id: nanoid() } });
   }, []);
 
+  const updateActivity = useCallback((payload: { id: string; updates: Partial<Omit<Activity, 'id'>> }) => {
+    dispatch({ type: 'update-activity', payload });
+  }, []);
+
+  const deleteActivity = useCallback((id: string) => {
+    dispatch({ type: 'delete-activity', payload: { id } });
+  }, []);
+
+  const updateJournalEntry = useCallback(
+    (payload: { id: string; updates: Partial<Omit<JournalEntry, 'id'>> }) => {
+      dispatch({ type: 'update-journal-entry', payload });
+    },
+    [],
+  );
+
+  const deleteJournalEntry = useCallback((id: string) => {
+    dispatch({ type: 'delete-journal-entry', payload: { id } });
+  }, []);
+
+  const updateReminder = useCallback((payload: { id: string; updates: Partial<Omit<Reminder, 'id'>> }) => {
+    dispatch({ type: 'update-reminder', payload });
+  }, []);
+
+  const deleteReminder = useCallback((id: string) => {
+    dispatch({ type: 'delete-reminder', payload: { id } });
+  }, []);
+
+  const addPet = useCallback((payload: Omit<Pet, 'id'>) => {
+    dispatch({ type: 'add-pet', payload: { ...payload, id: nanoid() } });
+  }, []);
+
+  const updatePet = useCallback((payload: Pet) => {
+    dispatch({ type: 'update-pet', payload });
+  }, []);
+
+  const deletePet = useCallback((petId: PetId) => {
+    dispatch({ type: 'delete-pet', payload: petId });
+  }, []);
+
   const addHealthRecord = useCallback(
     (payload: { petId: PetId; record: Omit<HealthRecord, 'id'> }) => {
       dispatch({
@@ -270,6 +427,17 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     },
     [],
   );
+
+  const updateHealthRecord = useCallback(
+    (payload: { petId: PetId; recordId: string; updates: Partial<Omit<HealthRecord, 'id'>> }) => {
+      dispatch({ type: 'update-health-record', payload });
+    },
+    [],
+  );
+
+  const deleteHealthRecord = useCallback((payload: { petId: PetId; recordId: string }) => {
+    dispatch({ type: 'delete-health-record', payload });
+  }, []);
 
   const completeActionAndGrantXP = useCallback((xp: number) => {
     dispatch({ type: 'grant-xp', payload: xp });
@@ -287,12 +455,43 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       setSelectedPet,
       addActivity,
       addJournalEntry,
+      updateActivity,
+      deleteActivity,
+      updateJournalEntry,
+      deleteJournalEntry,
       addReminder,
+      updateReminder,
+      deleteReminder,
+      addPet,
+      updatePet,
+      deletePet,
       addHealthRecord,
+      updateHealthRecord,
+      deleteHealthRecord,
       completeActionAndGrantXP,
       updatePreferences,
     };
-  }, [state, setSelectedPet, addActivity, addJournalEntry, addReminder, addHealthRecord, completeActionAndGrantXP, updatePreferences]);
+  }, [
+    state,
+    setSelectedPet,
+    addActivity,
+    addJournalEntry,
+    addReminder,
+    addPet,
+    updateActivity,
+    deleteActivity,
+    updateJournalEntry,
+    deleteJournalEntry,
+    updateReminder,
+    deleteReminder,
+    updatePet,
+    deletePet,
+    addHealthRecord,
+    updateHealthRecord,
+    deleteHealthRecord,
+    completeActionAndGrantXP,
+    updatePreferences,
+  ]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 };

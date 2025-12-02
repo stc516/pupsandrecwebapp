@@ -10,10 +10,11 @@ export const TopBar = () => {
   const currentProgress = nextLevelProgress(xp);
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-100 bg-white/90 px-4 pb-3 pt-[calc(0.75rem+var(--safe-area-top))] backdrop-blur">
+    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-brand-border/70 bg-white/85 px-4 pb-3 pt-[calc(0.75rem+var(--safe-area-top))] shadow-[0_8px_32px_rgba(15,23,42,0.08)] backdrop-blur">
       <div>
         <p className="text-xs uppercase tracking-wide text-text-muted">Pups & Rec</p>
         <h1 className="text-base font-semibold text-brand-primary sm:text-lg">Daily Companion</h1>
+        <div className="mt-1 h-1 w-20 rounded-full bg-gradient-to-r from-brand-accent to-brand-blush" />
       </div>
       <div className="flex items-center gap-4">
         <div className="hidden md:flex flex-col text-right text-xs text-text-muted">
@@ -28,7 +29,7 @@ export const TopBar = () => {
             />
           </div>
         </div>
-        <div className="flex items-center gap-1 rounded-full bg-brand-accent/15 px-3 py-1 text-sm font-semibold text-brand-accent">
+        <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-brand-accent to-brand-accentDeep px-3 py-1 text-sm font-semibold text-white shadow">
           <Sparkles size={16} />
           <span>{xp} XP</span>
         </div>
