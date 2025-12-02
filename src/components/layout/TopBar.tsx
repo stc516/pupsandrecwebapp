@@ -1,13 +1,22 @@
 import { Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { useAppState } from '../../hooks/useAppState';
+import { useAuth } from '../../hooks/useAuth';
 import { calculateLevel, nextLevelProgress, XP_PER_LEVEL } from '../../utils/xp';
 import { PetSwitcher } from './pet-switcher';
 
 export const TopBar = () => {
   const { xp } = useAppState();
+  const { user, logout, isLoading } = useAuth();
   const level = calculateLevel(xp);
   const currentProgress = nextLevelProgress(xp);
+
+  const handleLogout = () => {
+    logout().catch((error) => {
+      console.error('Failed to log out', error);
+    });
+  };
 
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between border-b border-brand-border/70 bg-white/85 px-4 pb-3 pt-[calc(0.75rem+var(--safe-area-top))] shadow-[0_8px_32px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -33,7 +42,32 @@ export const TopBar = () => {
           <Sparkles size={16} />
           <span>{xp} XP</span>
         </div>
-        <PetSwitcher />
+        <div className="flex items-center gap-3">
+          {user ? (
+            <>
+              <div className="hidden flex-col text-right text-xs text-text-muted sm:flex">
+                <span className="font-semibold text-brand-primary">{user.email}</span>
+                <span>Signed in</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={isLoading}
+                className="rounded-full border border-brand-border px-3 py-1 text-sm font-semibold text-brand-primary transition hover:bg-brand-subtle disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <Link
+              to="/login"
+              className="rounded-full border border-brand-border px-3 py-1 text-sm font-semibold text-brand-primary transition hover:bg-brand-subtle"
+            >
+              Sign in
+            </Link>
+          )}
+          <PetSwitcher />
+        </div>
       </div>
     </header>
   );

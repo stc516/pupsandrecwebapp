@@ -5,16 +5,20 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   type ReactNode,
 } from 'react';
 import { nanoid } from 'nanoid';
 import { addDays, parseISO, startOfDay } from 'date-fns';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 import { activities as seedActivities } from '../data/activities';
 import { achievements as achievementCatalog } from '../data/achievements';
 import { journalEntries as seedJournal } from '../data/journal';
 import { pets as seedPets } from '../data/pets';
 import { reminders as seedReminders } from '../data/reminders';
+import { useAuth } from '../hooks/useAuth';
+import { db } from '../lib/firebase';
 import type {
   AchievementProgress,
   Activity,
@@ -57,6 +61,7 @@ const buildAchievementState = (): AchievementProgress[] =>
 
 type Action =
   | { type: 'set-selected-pet'; payload: PetId }
+  | { type: 'hydrate'; payload: Partial<AppState> }
   | { type: 'add-activity'; payload: Activity }
   | { type: 'update-activity'; payload: { id: string; updates: Partial<Omit<Activity, 'id'>> } }
   | { type: 'delete-activity'; payload: { id: string } }
@@ -186,6 +191,22 @@ const reducer = (state: AppState, action: Action): AppState => {
   switch (action.type) {
     case 'set-selected-pet':
       return { ...state, selectedPetId: action.payload };
+    case 'hydrate': {
+      const merged: AppState = {
+        ...state,
+        ...(action.payload as AppState),
+      };
+      if (action.payload.activities) {
+        merged.activities = sortActivities(action.payload.activities);
+      }
+      if (action.payload.journalEntries) {
+        merged.journalEntries = sortJournal(action.payload.journalEntries);
+      }
+      if (action.payload.pets && !merged.pets.some((pet) => pet.id === merged.selectedPetId)) {
+        merged.selectedPetId = merged.pets[0]?.id ?? merged.selectedPetId;
+      }
+      return addAchievementXp(merged);
+    }
     case 'add-activity': {
       const updatedState = {
         ...state,
@@ -351,14 +372,69 @@ interface AppStateContextValue extends AppState {
 const AppStateContext = createContext<AppStateContextValue | undefined>(undefined);
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuth();
   const persisted = loadPersistedState();
   const startingState = addAchievementXp(persisted ?? baseState);
   const [state, dispatch] = useReducer(reducer, startingState);
+  const latestStateRef = useRef(state);
+  const hasHydratedFromRemote = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  useEffect(() => {
+    latestStateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    if (!user) {
+      hasHydratedFromRemote.current = false;
+      return;
+    }
+    let cancelled = false;
+    const userDocRef = doc(db, 'users', user.uid);
+
+    const loadRemoteState = async () => {
+      try {
+        const snapshot = await getDoc(userDocRef);
+        if (cancelled) return;
+        if (snapshot.exists()) {
+          const data = snapshot.data() as Partial<AppState> & { updatedAt?: string };
+          const { updatedAt: _ignored, ...rest } = data;
+          dispatch({ type: 'hydrate', payload: rest });
+        } else {
+          await setDoc(userDocRef, { ...latestStateRef.current, updatedAt: new Date().toISOString() });
+        }
+      } catch (error) {
+        console.error('Failed to load user data from Firestore', error);
+      } finally {
+        if (!cancelled) {
+          hasHydratedFromRemote.current = true;
+        }
+      }
+    };
+
+    loadRemoteState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !hasHydratedFromRemote.current) return;
+    const userDocRef = doc(db, 'users', user.uid);
+    const persist = async () => {
+      try {
+        await setDoc(userDocRef, { ...state, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (error) {
+        console.error('Failed to persist user data to Firestore', error);
+      }
+    };
+    persist();
+  }, [state, user]);
 
   const setSelectedPet = useCallback((petId: PetId) => {
     dispatch({ type: 'set-selected-pet', payload: petId });
