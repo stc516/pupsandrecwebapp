@@ -1,15 +1,23 @@
-import { useState } from 'react';
 import { Shield, UserRound } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { Card } from '../../components/ui/Card';
 import { PrimaryButton, SecondaryButton } from '../../components/ui/Button';
 import { ToggleSwitch } from '../../components/ui/Toggle';
 import { PageLayout } from '../../components/layout/PageLayout';
 import { useAppState } from '../../hooks/useAppState';
+import { useAuth } from '../../hooks/useAuth';
 
 export const SettingsPage = () => {
   const { preferences, updatePreferences } = useAppState();
-  const [email] = useState(preferences.email);
+  const { user, logout, isLoading } = useAuth();
+  const accountEmail = user?.email ?? preferences.email;
+
+  const handleLogout = () => {
+    logout().catch((error) => {
+      console.error('Failed to log out', error);
+    });
+  };
 
   return (
     <PageLayout title="Settings" subtitle="Tailor notifications and privacy">
@@ -77,8 +85,25 @@ export const SettingsPage = () => {
         <h3 className="text-lg font-semibold">Account</h3>
         <label className="flex flex-col text-sm font-medium text-slate-700">
           Email
-          <input className="mt-1 rounded-2xl border border-slate-200 px-3 py-2" value={email} readOnly />
+          <input className="mt-1 rounded-2xl border border-slate-200 px-3 py-2" value={accountEmail} readOnly />
         </label>
+        <div className="flex flex-col gap-3 rounded-2xl bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold">Account status</p>
+            <p className="text-xs text-slate-500">
+              {user ? `Signed in as ${user.email}` : 'Browsing in demo mode'}
+            </p>
+          </div>
+          {user ? (
+            <SecondaryButton type="button" onClick={handleLogout} disabled={isLoading}>
+              {isLoading ? 'Signing out…' : 'Log out'}
+            </SecondaryButton>
+          ) : (
+            <Link to="/login" className="text-sm font-semibold text-brand-primary hover:underline">
+              Sign in
+            </Link>
+          )}
+        </div>
         <div className="flex flex-wrap gap-3">
           <PrimaryButton type="button">Change password</PrimaryButton>
           <SecondaryButton type="button" className="text-red-600">

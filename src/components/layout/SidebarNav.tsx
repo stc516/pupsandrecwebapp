@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { navItems } from './navItems';
 
 export const SidebarNav = () => (
-  <aside className="sticky top-6 hidden h-[calc(100vh-3rem)] w-60 flex-shrink-0 rounded-3xl border border-brand-border bg-white p-4 shadow-card md:flex md:flex-col">
+  <aside className="sticky top-6 hidden h-[calc(100vh-3rem)] w-52 flex-shrink-0 rounded-3xl border border-brand-border bg-white p-4 shadow-card md:flex md:flex-col">
     <div className="mb-4 text-sm font-semibold text-text-muted">Navigate</div>
     <nav className="space-y-1">
       {navItems.map((item) => (

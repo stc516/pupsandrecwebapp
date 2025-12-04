@@ -10,7 +10,6 @@ import {
 } from 'react';
 import { nanoid } from 'nanoid';
 import { addDays, parseISO, startOfDay } from 'date-fns';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 import { activities as seedActivities } from '../data/activities';
 import { achievements as achievementCatalog } from '../data/achievements';
@@ -18,7 +17,6 @@ import { journalEntries as seedJournal } from '../data/journal';
 import { pets as seedPets } from '../data/pets';
 import { reminders as seedReminders } from '../data/reminders';
 import { useAuth } from '../hooks/useAuth';
-import { db } from '../lib/firebase';
 import type {
   AchievementProgress,
   Activity,
@@ -376,8 +374,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const persisted = loadPersistedState();
   const startingState = addAchievementXp(persisted ?? baseState);
   const [state, dispatch] = useReducer(reducer, startingState);
-  const latestStateRef = useRef(state);
-  const hasHydratedFromRemote = useRef(false);
+  const previousUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -385,56 +382,16 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   }, [state]);
 
   useEffect(() => {
-    latestStateRef.current = state;
-  }, [state]);
-
-  useEffect(() => {
-    if (!user) {
-      hasHydratedFromRemote.current = false;
-      return;
+    const wasLoggedIn = Boolean(previousUserIdRef.current);
+    if (wasLoggedIn && !user) {
+      const demoState = addAchievementXp(baseState);
+      dispatch({ type: 'hydrate', payload: demoState });
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(demoState));
+      }
     }
-    let cancelled = false;
-    const userDocRef = doc(db, 'users', user.uid);
-
-    const loadRemoteState = async () => {
-      try {
-        const snapshot = await getDoc(userDocRef);
-        if (cancelled) return;
-        if (snapshot.exists()) {
-          const data = snapshot.data() as Partial<AppState> & { updatedAt?: string };
-          const { updatedAt: _ignored, ...rest } = data;
-          dispatch({ type: 'hydrate', payload: rest });
-        } else {
-          await setDoc(userDocRef, { ...latestStateRef.current, updatedAt: new Date().toISOString() });
-        }
-      } catch (error) {
-        console.error('Failed to load user data from Firestore', error);
-      } finally {
-        if (!cancelled) {
-          hasHydratedFromRemote.current = true;
-        }
-      }
-    };
-
-    loadRemoteState();
-
-    return () => {
-      cancelled = true;
-    };
+    previousUserIdRef.current = user?.id ?? null;
   }, [user]);
-
-  useEffect(() => {
-    if (!user || !hasHydratedFromRemote.current) return;
-    const userDocRef = doc(db, 'users', user.uid);
-    const persist = async () => {
-      try {
-        await setDoc(userDocRef, { ...state, updatedAt: new Date().toISOString() }, { merge: true });
-      } catch (error) {
-        console.error('Failed to persist user data to Firestore', error);
-      }
-    };
-    persist();
-  }, [state, user]);
 
   const setSelectedPet = useCallback((petId: PetId) => {
     dispatch({ type: 'set-selected-pet', payload: petId });

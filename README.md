@@ -1,73 +1,85 @@
-# React + TypeScript + Vite
+# Pups & Rec PWA
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Modern React + TypeScript + Vite + Tailwind progressive web app for tracking dog activities, journals, reminders, and achievements. The app supports Firebase Authentication (email/password) and syncs user data to Firestore while keeping a seeded localStorage experience for demo users.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React 18 + Vite + TypeScript
+- TailwindCSS & custom UI kit
+- Firebase Web SDK (Auth + Firestore)
+- React Router + PWA plugin
 
-## React Compiler
+## Getting Started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. **Install dependencies**
 
-## Expanding the ESLint configuration
+   ```bash
+   npm install
+   ```
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+2. **Create Firebase project (once)**
+   - Enable Email/Password provider in **Authentication → Sign-in method**
+   - Create a Firestore database (native mode)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+3. **Configure environment variables**
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+   Create `.env.local` (not committed) in the project root and paste your Firebase web config:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+   ```
+   VITE_FIREBASE_API_KEY=your-api-key
+   VITE_FIREBASE_AUTH_DOMAIN=your-auth-domain
+   VITE_FIREBASE_PROJECT_ID=your-project-id
+   VITE_FIREBASE_STORAGE_BUCKET=your-storage-bucket
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+   VITE_FIREBASE_APP_ID=your-app-id
+   ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+   Restart `npm run dev` whenever env variables change.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+4. **Run**
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+   ```bash
+   npm run dev     # local dev server
+   npm run build   # production build + PWA assets
+   ```
+
+## Authentication & Routing
+
+- `/login` and `/signup` provide real email/password auth.
+- Auth state is provided via `AuthContext` (`useAuth()`), which exposes `user`, `isAuthReady`, `isLoading`, `login`, `signup`, and `logout`.
+- A global loading screen renders while Firebase checks the session.
+- Protected routes (`/`, `/activity`, `/journal`, etc.) are wrapped in `ProtectedRoute` so unauthenticated visitors are redirected to `/login`.
+- Authenticated users visiting `/login` or `/signup` are sent directly to `/`.
+- The Settings page surfaces the signed-in email and provides a logout button; guests stay in “demo mode.”
+
+## Data Sync Strategy
+
+- `AppStateContext` still seeds demo data from localStorage so the app works offline or without an account.
+- When a user signs in:
+  - Firestore (`users/{uid}`) becomes the source of truth.
+  - The reducer hydrates from that document and persists updates back to Firestore plus localStorage (for offline cache).
+- When a user signs out:
+  - Local state resets to the seeded demo data so unauthenticated users see the default experience again.
+
+## Firestore Collections (scaffolded)
+
+The `src/lib/firestore.ts` helper exposes typed references for:
+
+- `users/{userId}` (profile/state document used today)
+- `users/{userId}/pets`
+- `users/{userId}/activities`
+- `users/{userId}/journal`
+- `users/{userId}/reminders`
+- `users/{userId}/achievements`
+
+Only the top-level user document is persisted right now; these collections are ready for finer-grained sync work.
+
+## Testing & Deployment
+
+Run `npm run build` to ensure the TypeScript project compiles and that the PWA assets are generated. Deploy the contents of `dist/` (along with service worker files) to your hosting platform of choice (Vercel, Firebase Hosting, etc.).
+
+## Notes / Next Steps
+
+- Run `npx tsc --noEmit` or `npm run build` locally to confirm type safety after UI refactors.
+- When media storage is ready, replace the placeholder photo-drop section in the Journal composer with the real media upload flow.
+
