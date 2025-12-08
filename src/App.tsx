@@ -1,8 +1,8 @@
 import { Outlet } from 'react-router-dom';
 
-import { BottomNav } from './components/layout/BottomNav';
-import { SidebarNav } from './components/layout/SidebarNav';
-import { TopBar } from './components/layout/TopBar';
+import { BottomNav } from './layouts/BottomNav';
+import { SidebarNav } from './layouts/SidebarNav';
+import { TopBar } from './layouts/TopBar';
 import { InstallPrompt } from './components/ui/InstallPrompt';
 
 export const AppLayout = () => (

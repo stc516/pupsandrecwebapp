@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { PrimaryButton, SecondaryButton } from '../../components/ui/Button';
 import { ToggleSwitch } from '../../components/ui/Toggle';
-import { PageLayout } from '../../components/layout/PageLayout';
+import { PageLayout } from '../../layouts/PageLayout';
 import { useAppState } from '../../hooks/useAppState';
 import { useAuth } from '../../hooks/useAuth';
 

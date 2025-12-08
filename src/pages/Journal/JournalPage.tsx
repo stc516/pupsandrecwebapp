@@ -25,7 +25,7 @@ import clsx from 'clsx';
 
 import { Card } from '../../components/ui/Card';
 import { PrimaryButton } from '../../components/ui/Button';
-import { PageLayout } from '../../components/layout/PageLayout';
+import { PageLayout } from '../../layouts/PageLayout';
 import { useAppState } from '../../hooks/useAppState';
 import { formatDate } from '../../utils/dates';
 import { useToast } from '../../components/ui/ToastProvider';

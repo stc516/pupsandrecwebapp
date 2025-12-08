@@ -4,7 +4,7 @@ import { nanoid } from 'nanoid';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Card } from '../../components/ui/Card';
-import { PageLayout } from '../../components/layout/PageLayout';
+import { PageLayout } from '../../layouts/PageLayout';
 import { useAppState } from '../../hooks/useAppState';
 import { formatDate, formatTime } from '../../utils/dates';
 import { PrimaryButton } from '../../components/ui/Button';

@@ -1,9 +1,9 @@
 import { Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { useAppState } from '../../hooks/useAppState';
-import { useAuth } from '../../hooks/useAuth';
-import { calculateLevel, nextLevelProgress, XP_PER_LEVEL } from '../../utils/xp';
+import { useAppState } from '../hooks/useAppState';
+import { useAuth } from '../hooks/useAuth';
+import { calculateLevel, nextLevelProgress, XP_PER_LEVEL } from '../utils/xp';
 import { PetSwitcher } from './pet-switcher';
 
 export const TopBar = () => {

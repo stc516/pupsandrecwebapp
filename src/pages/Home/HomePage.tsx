@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { Card } from '../../components/ui/Card';
 import { StatPill } from '../../components/ui/StatPill';
-import { PageLayout } from '../../components/layout/PageLayout';
+import { PageLayout } from '../../layouts/PageLayout';
 import { useAppState } from '../../hooks/useAppState';
 import { formatDate } from '../../utils/dates';
 

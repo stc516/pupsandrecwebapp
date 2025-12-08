@@ -1,4 +1,4 @@
-import { useAppState } from '../../hooks/useAppState';
+import { useAppState } from '../hooks/useAppState';
 
 export const PetSwitcher = () => {
   const { pets, selectedPetId, setSelectedPet } = useAppState();

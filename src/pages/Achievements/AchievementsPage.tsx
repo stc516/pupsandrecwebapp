@@ -2,7 +2,7 @@ import { Award, Trophy } from 'lucide-react';
 
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
-import { PageLayout } from '../../components/layout/PageLayout';
+import { PageLayout } from '../../layouts/PageLayout';
 import { useAppState } from '../../hooks/useAppState';
 import { calculateLevel, percentToNextLevel, XP_PER_LEVEL } from '../../utils/xp';
 
