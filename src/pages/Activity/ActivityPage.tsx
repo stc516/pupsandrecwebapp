@@ -49,23 +49,46 @@ export const ActivityPage = () => {
     photoUrl: '',
   });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+  const [typeFilter, setTypeFilter] = useState<'all' | ActivityTypeOption>('all');
+  const [rangeFilter, setRangeFilter] = useState<'7' | '30' | 'all'>('30');
 
   const selectedActivities = useMemo(
     () => activities.filter((activity) => activity.petId === selectedPetId),
     [activities, selectedPetId],
   );
 
+  const filteredActivities = useMemo(() => {
+    const today = startOfDay(new Date()).getTime();
+    const daysBack = rangeFilter === 'all' ? null : Number(rangeFilter);
+    return selectedActivities.filter((activity) => {
+      if (typeFilter !== 'all' && activity.type !== typeFilter) return false;
+      if (daysBack !== null) {
+        const activityDay = startOfDay(new Date(activity.date)).getTime();
+        const diffDays = (today - activityDay) / (1000 * 60 * 60 * 24);
+        if (diffDays < 0 || diffDays > daysBack) return false;
+      }
+      return true;
+    });
+  }, [selectedActivities, typeFilter, rangeFilter]);
+
+  const last7Activities = useMemo(() => {
+    const cutoff = addDays(startOfDay(new Date()), -6).getTime();
+    return selectedActivities.filter(
+      (activity) => startOfDay(new Date(activity.date)).getTime() >= cutoff,
+    );
+  }, [selectedActivities]);
+
   const typeBreakdown = useMemo(() => {
     const counts = typeOptions.map((type) => ({
       type,
-      count: selectedActivities.filter((a) => a.type === type).length,
+      count: last7Activities.filter((a) => a.type === type).length,
     }));
     const total = counts.reduce((sum, item) => sum + item.count, 0) || 1;
     return counts.map((item) => ({
       ...item,
       percent: Math.round((item.count / total) * 100),
     }));
-  }, [selectedActivities]);
+  }, [last7Activities]);
 
   const weeklyStats = useMemo(() => {
     const today = startOfDay(new Date());
@@ -83,6 +106,20 @@ export const ActivityPage = () => {
     const totalCount = days.reduce((sum, d) => sum + d.count, 0);
     const maxMinutes = Math.max(...days.map((d) => d.minutes), 30); // avoid zero height
     return { days, totalMinutes, totalCount, maxMinutes };
+  }, [selectedActivities]);
+
+  const trend30 = useMemo(() => {
+    const today = startOfDay(new Date());
+    const days = Array.from({ length: 30 }).map((_, idx) => {
+      const date = addDays(today, -(29 - idx));
+      const matches = selectedActivities.filter(
+        (activity) => startOfDay(new Date(activity.date)).getTime() === date.getTime(),
+      );
+      const minutes = matches.reduce((sum, a) => sum + (a.durationMinutes ?? 0), 0);
+      return { date, minutes };
+    });
+    const maxMinutes = Math.max(...days.map((d) => d.minutes), 30);
+    return { days, maxMinutes };
   }, [selectedActivities]);
 
   const currentStreak = useMemo(() => {
@@ -284,6 +321,27 @@ export const ActivityPage = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </Card>
+        <Card padding="lg">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-brand-primary">30-day Trend</h3>
+              <p className="text-sm text-text-secondary">Minutes per day</p>
+            </div>
+          </div>
+          <div className="mt-4 flex items-end gap-1 overflow-hidden rounded-2xl border border-brand-border/60 bg-white p-3">
+            {trend30.days.map((day) => {
+              const height = Math.max(10, (day.minutes / trend30.maxMinutes) * 70);
+              return (
+                <div
+                  key={day.date.toISOString()}
+                  className="flex-1 rounded-full bg-brand-accent/30"
+                  style={{ height }}
+                  title={`${format(day.date, 'MMM d')}: ${day.minutes} min`}
+                />
+              );
+            })}
           </div>
         </Card>
         <div className="grid gap-4 md:grid-cols-5">
@@ -500,12 +558,35 @@ export const ActivityPage = () => {
           </Card>
         )}
         <Card className="md:col-span-3" padding="lg">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-lg font-semibold text-brand-primary">Recent Logs</h3>
-            <TagChip variant="accent">{selectedActivities.length} total</TagChip>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                className="rounded-full border border-brand-border px-3 py-1 text-xs font-semibold text-brand-primary focus:outline-none"
+                value={typeFilter}
+                onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}
+              >
+                <option value="all">All types</option>
+                {typeOptions.map((type) => (
+                  <option key={type}>{type}</option>
+                ))}
+              </select>
+              <select
+                className="rounded-full border border-brand-border px-3 py-1 text-xs font-semibold text-brand-primary focus:outline-none"
+                value={rangeFilter}
+                onChange={(event) => setRangeFilter(event.target.value as typeof rangeFilter)}
+              >
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="all">All time</option>
+              </select>
+              <TagChip variant="accent">
+                {filteredActivities.length} / {selectedActivities.length} shown
+              </TagChip>
+            </div>
           </div>
           <div className="mt-4 space-y-3">
-            {selectedActivities.map((activity) => (
+            {filteredActivities.map((activity) => (
               <div
                 key={activity.id}
                 className="flex flex-col gap-3 rounded-3xl border border-brand-border p-4 sm:flex-row sm:items-center sm:justify-between"

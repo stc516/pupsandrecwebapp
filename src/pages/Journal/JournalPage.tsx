@@ -16,6 +16,7 @@ import {
   PenSquare,
   Pencil,
   Plus,
+  Search,
   Sparkles,
   Tag as TagIcon,
   Tags,
@@ -40,6 +41,7 @@ type FilterState = {
   pet: string;
   category: 'all' | JournalCategory;
   tag: string;
+  query: string;
 };
 
 type JournalFormState = {
@@ -168,6 +170,7 @@ export const JournalPage = () => {
     pet: selectedPetId ?? 'all',
     category: 'all',
     tag: '',
+    query: '',
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [formState, setFormState] = useState<JournalFormState>(() => createInitialFormState());
@@ -191,6 +194,12 @@ export const JournalPage = () => {
         )
       ) {
         return false;
+      }
+      if (filters.query) {
+        const q = filters.query.toLowerCase();
+        const matchesText =
+          entry.title.toLowerCase().includes(q) || entry.content.toLowerCase().includes(q);
+        if (!matchesText) return false;
       }
       return true;
     });
@@ -512,7 +521,7 @@ const JournalFilters = ({
         Filters
       </button>
     </div>
-    <div className={clsx('grid gap-3 md:grid-cols-3', !filtersOpen && 'hidden md:grid')}>
+    <div className={clsx('grid gap-3 md:grid-cols-4', !filtersOpen && 'hidden md:grid')}>
       <div className="flex items-center gap-3 rounded-2xl border border-brand-border bg-white px-3 py-2">
         <img
           src={getPetAvatar(activePet)}
@@ -579,6 +588,17 @@ const JournalFilters = ({
               #{tag}
             </button>
           ))}
+        </div>
+      </div>
+      <div className="rounded-2xl border border-brand-border bg-white px-3 py-2">
+        <div className="flex items-center gap-2">
+          <Search size={16} className="text-brand-primary/60" />
+          <input
+            className="w-full border-none bg-transparent text-sm text-brand-primary focus:outline-none"
+            placeholder="Search title or notes"
+            value={filters.query}
+            onChange={(event) => onChangeFilter({ query: event.target.value })}
+          />
         </div>
       </div>
     </div>

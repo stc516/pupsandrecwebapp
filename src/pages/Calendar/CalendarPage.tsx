@@ -1,7 +1,7 @@
 import { addMonths, subMonths, differenceInCalendarDays, differenceInCalendarMonths, startOfDay } from 'date-fns';
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Pencil, Trash2 } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, Pencil, Repeat, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 
 import { Card } from '../../components/ui/Card';
@@ -233,6 +233,9 @@ export const CalendarPage = () => {
                   const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
                   const isSelected = sameDay(day, selectedDate);
                   const matches = reminders.filter((reminder) => reminder.petId === selectedPetId && occursOnDate(reminder, day));
+                  const hasRecurring = matches.some(
+                    (reminder) => reminder.recurrence && reminder.recurrence.frequency !== 'none',
+                  );
                   return (
                     <button
                       key={day.toISOString()}
@@ -243,7 +246,10 @@ export const CalendarPage = () => {
                       } ${isCurrentMonth ? '' : 'text-text-muted'}`}
                       onClick={() => setSelectedDate(day)}
                     >
-                      <span>{day.getDate()}</span>
+                      <span className="flex items-center gap-1">
+                        <span>{day.getDate()}</span>
+                        {hasRecurring && <Repeat size={12} className="text-brand-accent" aria-hidden />}
+                      </span>
                       {matches.length > 0 && (
                         <span className="mt-1 rounded-full bg-brand-accent/20 px-2 text-xs text-brand-primary">
                           {matches.length}
@@ -260,151 +266,160 @@ export const CalendarPage = () => {
           <Card padding="lg">
             <h3 className="text-lg font-semibold text-brand-primary">Reminders on {formatDate(selectedDate)}</h3>
             <div className="mt-3 space-y-3">
-              {dayReminders.map((reminder) => (
-                <div key={reminder.id} className="rounded-2xl border border-brand-border p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-brand-primary">{reminder.title}</p>
-                      <p className="mt-1 flex items-center gap-1 text-xs text-text-secondary">
-                        <Clock size={14} /> {formatTime(reminder.dateTime)}
-                      </p>
-                    </div>
-                <div className="flex items-center gap-2">
-                      <TagChip>{reminder.type}</TagChip>
-                  {reminder.recurrence?.frequency && reminder.recurrence.frequency !== 'none' && (
-                    <TagChip>{recurrenceLabel(reminder.recurrence)}</TagChip>
-                  )}
-                      <button
-                        type="button"
-                        onClick={() => startEditingReminder(reminder.id)}
-                        className="inline-flex items-center gap-1 rounded-full border border-brand-border px-2.5 py-1 text-xs font-semibold text-brand-primary"
-                      >
-                        <Pencil size={12} />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteReminder(reminder.id)}
-                        className="inline-flex items-center gap-1 rounded-full border border-red-100 px-2.5 py-1 text-xs font-semibold text-red-600"
-                      >
-                        <Trash2 size={12} />
-                        Delete
-                      </button>
-                    </div>
+              {dayReminders.map((reminder) => {
+                const isEditing = editingReminderId === reminder.id;
+                return (
+                  <div key={reminder.id} className="rounded-2xl border border-brand-border p-4">
+                    {isEditing ? (
+                      <form className="space-y-3" onSubmit={handleEditSubmit}>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                            Title
+                            <input
+                              className={fieldClasses(Boolean(editErrors.title))}
+                              value={editState.title}
+                              onChange={(event) =>
+                                setEditState((prev) => ({ ...prev, title: event.target.value }))
+                              }
+                              aria-invalid={Boolean(editErrors.title)}
+                            />
+                            {editErrors.title && <p className="mt-1 text-xs text-red-500">{editErrors.title}</p>}
+                          </label>
+                          <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                            Type
+                            <select
+                              className={fieldClasses(false)}
+                              value={editState.type}
+                              onChange={(event) =>
+                                setEditState((prev) => ({
+                                  ...prev,
+                                  type: event.target.value as ReminderType,
+                                }))
+                              }
+                            >
+                              {reminderTypes.map((type) => (
+                                <option key={type}>{type}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                        <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                          When
+                          <input
+                            type="datetime-local"
+                            className={fieldClasses(Boolean(editErrors.dateTime))}
+                            value={editState.dateTime}
+                            onChange={(event) => setEditState((prev) => ({ ...prev, dateTime: event.target.value }))}
+                            aria-invalid={Boolean(editErrors.dateTime)}
+                          />
+                          {editErrors.dateTime && <p className="mt-1 text-xs text-red-500">{editErrors.dateTime}</p>}
+                        </label>
+                        <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                          Repeats
+                          <select
+                            className={fieldClasses(false)}
+                            value={editState.recurrence.frequency}
+                            onChange={(event) =>
+                              setEditState((prev) => ({
+                                ...prev,
+                                recurrence: { ...prev.recurrence, frequency: event.target.value as RecurrenceFrequency },
+                              }))
+                            }
+                          >
+                            <option value="none">Does not repeat</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                          </select>
+                        </label>
+                        {editState.recurrence.frequency !== 'none' && (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                              Every
+                              <input
+                                type="number"
+                                min={1}
+                                className={fieldClasses(false)}
+                                value={editState.recurrence.interval}
+                                onChange={(event) =>
+                                  setEditState((prev) => ({
+                                    ...prev,
+                                    recurrence: { ...prev.recurrence, interval: Number(event.target.value) || 1 },
+                                  }))
+                                }
+                              />
+                            </label>
+                            <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                              Ends (optional)
+                              <input
+                                type="date"
+                                className={fieldClasses(false)}
+                                value={editState.recurrence.until}
+                                onChange={(event) =>
+                                  setEditState((prev) => ({
+                                    ...prev,
+                                    recurrence: { ...prev.recurrence, until: event.target.value },
+                                  }))
+                                }
+                              />
+                            </label>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <PrimaryButton type="submit" startIcon={<Pencil size={14} />}>
+                            Save
+                          </PrimaryButton>
+                          <SecondaryButton
+                            type="button"
+                            onClick={() => {
+                              setEditingReminderId(null);
+                              setEditErrors({});
+                            }}
+                          >
+                            Cancel
+                          </SecondaryButton>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-brand-primary">{reminder.title}</p>
+                          <p className="mt-1 flex items-center gap-1 text-xs text-text-secondary">
+                            <Clock size={14} /> {formatTime(reminder.dateTime)}
+                          </p>
+                          {reminder.recurrence?.frequency && reminder.recurrence.frequency !== 'none' && (
+                            <p className="mt-1 text-xs text-brand-primary">{recurrenceLabel(reminder.recurrence)}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <TagChip>{reminder.type}</TagChip>
+                          <button
+                            type="button"
+                            onClick={() => startEditingReminder(reminder.id)}
+                            className="inline-flex items-center gap-1 rounded-full border border-brand-border px-2.5 py-1 text-xs font-semibold text-brand-primary"
+                          >
+                            <Pencil size={12} />
+                            Edit inline
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteReminder(reminder.id)}
+                            className="inline-flex items-center gap-1 rounded-full border border-red-100 px-2.5 py-1 text-xs font-semibold text-red-600"
+                          >
+                            <Trash2 size={12} />
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {dayReminders.length === 0 && (
                 <p className="rounded-2xl bg-brand-subtle p-4 text-sm text-text-secondary">No reminders for this date.</p>
               )}
             </div>
           </Card>
-          {editingReminderId && (
-            <Card padding="lg">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-brand-primary">Edit Reminder</h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingReminderId(null);
-                    setEditErrors({});
-                  }}
-                  className="text-sm font-semibold text-text-secondary"
-                >
-                  Cancel
-                </button>
-              </div>
-              <form className="mt-4 space-y-4" onSubmit={handleEditSubmit}>
-                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                  Title
-                  <input
-                    className={fieldClasses(Boolean(editErrors.title))}
-                    value={editState.title}
-                    onChange={(event) => setEditState((prev) => ({ ...prev, title: event.target.value }))}
-                    aria-invalid={Boolean(editErrors.title)}
-                  />
-                  {editErrors.title && <p className="mt-1 text-xs text-red-500">{editErrors.title}</p>}
-                </label>
-                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                  Type
-                  <select
-                    className={fieldClasses(false)}
-                    value={editState.type}
-                    onChange={(event) =>
-                      setEditState((prev) => ({ ...prev, type: event.target.value as ReminderType }))
-                    }
-                  >
-                    {reminderTypes.map((type) => (
-                      <option key={type}>{type}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                  When
-                  <input
-                    type="datetime-local"
-                    className={fieldClasses(Boolean(editErrors.dateTime))}
-                    value={editState.dateTime}
-                    onChange={(event) => setEditState((prev) => ({ ...prev, dateTime: event.target.value }))}
-                    aria-invalid={Boolean(editErrors.dateTime)}
-                  />
-                  {editErrors.dateTime && <p className="mt-1 text-xs text-red-500">{editErrors.dateTime}</p>}
-                </label>
-                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                  Repeats
-                  <select
-                    className={fieldClasses(false)}
-                    value={editState.recurrence.frequency}
-                    onChange={(event) =>
-                      setEditState((prev) => ({
-                        ...prev,
-                        recurrence: { ...prev.recurrence, frequency: event.target.value as RecurrenceFrequency },
-                      }))
-                    }
-                  >
-                    <option value="none">Does not repeat</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </label>
-                {editState.recurrence.frequency !== 'none' && (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                      Every
-                      <input
-                        type="number"
-                        min={1}
-                        className={fieldClasses(false)}
-                        value={editState.recurrence.interval}
-                        onChange={(event) =>
-                          setEditState((prev) => ({
-                            ...prev,
-                            recurrence: { ...prev.recurrence, interval: Number(event.target.value) || 1 },
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                      Ends (optional)
-                      <input
-                        type="date"
-                        className={fieldClasses(false)}
-                        value={editState.recurrence.until}
-                        onChange={(event) =>
-                          setEditState((prev) => ({
-                            ...prev,
-                            recurrence: { ...prev.recurrence, until: event.target.value },
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                )}
-                <PrimaryButton type="submit" startIcon={<CalendarDays size={16} />}>Save changes</PrimaryButton>
-              </form>
-            </Card>
-          )}
           <Card padding="lg">
             <h3 className="text-lg font-semibold text-brand-primary">Add Reminder</h3>
             <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
