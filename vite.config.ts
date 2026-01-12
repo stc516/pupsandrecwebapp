@@ -61,7 +61,8 @@ export default defineConfig({
         ],
       },
       devOptions: {
-        enabled: true,
+        // Disable service worker during dev to avoid dev-dist artifacts and warnings.
+        enabled: false,
       },
     }),
   ],
