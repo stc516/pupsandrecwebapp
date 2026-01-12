@@ -1,4 +1,4 @@
-import { addMonths, subMonths } from 'date-fns';
+import { addMonths, subMonths, differenceInCalendarDays, differenceInCalendarMonths, startOfDay } from 'date-fns';
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Pencil, Trash2 } from 'lucide-react';
@@ -11,9 +11,58 @@ import { PageLayout } from '../../layouts/PageLayout';
 import { useAppState } from '../../hooks/useAppState';
 import { buildMonthMatrix, formatDate, formatTime, sameDay } from '../../utils/dates';
 import { useToast } from '../../components/ui/ToastProvider';
+import type { Reminder } from '../../types';
 
 const reminderTypes = ['walk', 'vet-appointment', 'medication', 'grooming', 'other'] as const;
 type ReminderType = (typeof reminderTypes)[number];
+type RecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly';
+
+const defaultRecurrence = { frequency: 'none' as RecurrenceFrequency, interval: 1, until: '' };
+
+const occursOnDate = (reminder: Reminder, date: Date) => {
+  const start = new Date(reminder.dateTime);
+  const normalizedDate = startOfDay(date);
+  const normalizedStart = startOfDay(start);
+
+  if (sameDay(normalizedStart, normalizedDate)) return true;
+
+  const recurrence = reminder.recurrence;
+  if (!recurrence || recurrence.frequency === 'none') return false;
+  if (recurrence.until) {
+    const until = startOfDay(new Date(recurrence.until));
+    if (normalizedDate.getTime() > until.getTime()) return false;
+  }
+
+  const interval = recurrence.interval ?? 1;
+  switch (recurrence.frequency) {
+    case 'daily': {
+      const diffDays = differenceInCalendarDays(normalizedDate, normalizedStart);
+      return diffDays >= 0 && diffDays % interval === 0;
+    }
+    case 'weekly': {
+      const diffDays = differenceInCalendarDays(normalizedDate, normalizedStart);
+      return (
+        diffDays >= 0 &&
+        normalizedDate.getDay() === normalizedStart.getDay() &&
+        Math.floor(diffDays / 7) % interval === 0
+      );
+    }
+    case 'monthly': {
+      const diffMonths = differenceInCalendarMonths(normalizedDate, normalizedStart);
+      return diffMonths >= 0 && normalizedDate.getDate() === normalizedStart.getDate() && diffMonths % interval === 0;
+    }
+    default:
+      return false;
+  }
+};
+
+const recurrenceLabel = (recurrence?: Reminder['recurrence']) => {
+  if (!recurrence || recurrence.frequency === 'none') return null;
+  const { frequency, interval = 1, until } = recurrence;
+  const label = `${frequency}${interval > 1 ? ` every ${interval}` : ''}`.replace('daily', 'Daily').replace('weekly', 'Weekly').replace('monthly', 'Monthly');
+  const untilLabel = until ? ` until ${formatDate(new Date(until))}` : '';
+  return `${label}${untilLabel}`;
+};
 
 export const CalendarPage = () => {
   const {
@@ -30,6 +79,7 @@ export const CalendarPage = () => {
     type: 'walk' as ReminderType,
     title: '',
     dateTime: new Date().toISOString().slice(0, 16),
+    recurrence: { ...defaultRecurrence },
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [editingReminderId, setEditingReminderId] = useState<string | null>(null);
@@ -37,12 +87,13 @@ export const CalendarPage = () => {
     type: 'walk' as ReminderType,
     title: '',
     dateTime: new Date().toISOString().slice(0, 16),
+    recurrence: { ...defaultRecurrence },
   });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
   const monthMatrix = useMemo(() => buildMonthMatrix(currentMonth), [currentMonth]);
   const dayReminders = reminders.filter(
-    (reminder) => reminder.petId === selectedPetId && sameDay(reminder.dateTime, selectedDate),
+    (reminder) => reminder.petId === selectedPetId && occursOnDate(reminder, selectedDate),
   );
 
   const fieldClasses = (hasError: boolean) =>
@@ -62,6 +113,15 @@ export const CalendarPage = () => {
     return nextErrors;
   };
 
+  const buildRecurrencePayload = (recurrenceState: typeof formState['recurrence']) => {
+    if (!recurrenceState || recurrenceState.frequency === 'none') return undefined;
+    return {
+      frequency: recurrenceState.frequency,
+      interval: recurrenceState.interval || 1,
+      until: recurrenceState.until || undefined,
+    } satisfies Reminder['recurrence'];
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedPetId) return;
@@ -76,8 +136,9 @@ export const CalendarPage = () => {
       type: formState.type,
       title: formState.title,
       dateTime: new Date(formState.dateTime).toISOString(),
+      recurrence: buildRecurrencePayload(formState.recurrence),
     });
-    setFormState((prev) => ({ ...prev, title: '' }));
+    setFormState((prev) => ({ ...prev, title: '', recurrence: { ...defaultRecurrence } }));
     setErrors({});
     pushToast({ tone: 'success', message: 'Reminder added.' });
   };
@@ -91,6 +152,11 @@ export const CalendarPage = () => {
       type: reminder.type,
       title: reminder.title,
       dateTime: reminder.dateTime.slice(0, 16),
+      recurrence: {
+        frequency: reminder.recurrence?.frequency ?? 'none',
+        interval: reminder.recurrence?.interval ?? 1,
+        until: reminder.recurrence?.until ?? '',
+      },
     });
   };
 
@@ -109,6 +175,7 @@ export const CalendarPage = () => {
         type: editState.type,
         title: editState.title,
         dateTime: new Date(editState.dateTime).toISOString(),
+          recurrence: buildRecurrencePayload(editState.recurrence),
       },
     });
     setEditingReminderId(null);
@@ -162,9 +229,7 @@ export const CalendarPage = () => {
                 {monthMatrix.flat().map((day) => {
                   const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
                   const isSelected = sameDay(day, selectedDate);
-                  const matches = reminders.filter(
-                    (reminder) => reminder.petId === selectedPetId && sameDay(reminder.dateTime, day),
-                  );
+                  const matches = reminders.filter((reminder) => reminder.petId === selectedPetId && occursOnDate(reminder, day));
                   return (
                     <button
                       key={day.toISOString()}
@@ -201,8 +266,11 @@ export const CalendarPage = () => {
                         <Clock size={14} /> {formatTime(reminder.dateTime)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                       <TagChip>{reminder.type}</TagChip>
+                  {reminder.recurrence?.frequency && reminder.recurrence.frequency !== 'none' && (
+                    <TagChip>{recurrenceLabel(reminder.recurrence)}</TagChip>
+                  )}
                       <button
                         type="button"
                         onClick={() => startEditingReminder(reminder.id)}
@@ -279,6 +347,40 @@ export const CalendarPage = () => {
                   />
                   {editErrors.dateTime && <p className="mt-1 text-xs text-red-500">{editErrors.dateTime}</p>}
                 </label>
+                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                  Repeats
+                  <select
+                    className={fieldClasses(false)}
+                    value={editState.recurrence.frequency}
+                    onChange={(event) =>
+                      setEditState((prev) => ({
+                        ...prev,
+                        recurrence: { ...prev.recurrence, frequency: event.target.value as RecurrenceFrequency },
+                      }))
+                    }
+                  >
+                    <option value="none">Does not repeat</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </label>
+                {editState.recurrence.frequency !== 'none' && (
+                  <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                    Ends (optional)
+                    <input
+                      type="date"
+                      className={fieldClasses(false)}
+                      value={editState.recurrence.until}
+                      onChange={(event) =>
+                        setEditState((prev) => ({
+                          ...prev,
+                          recurrence: { ...prev.recurrence, until: event.target.value },
+                        }))
+                      }
+                    />
+                  </label>
+                )}
                 <PrimaryButton type="submit" startIcon={<CalendarDays size={16} />}>Save changes</PrimaryButton>
               </form>
             </Card>
@@ -321,6 +423,40 @@ export const CalendarPage = () => {
                 />
                 {errors.dateTime && <p className="mt-1 text-xs text-red-500">{errors.dateTime}</p>}
               </label>
+              <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                Repeats
+                <select
+                  className={fieldClasses(false)}
+                  value={formState.recurrence.frequency}
+                  onChange={(event) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      recurrence: { ...prev.recurrence, frequency: event.target.value as RecurrenceFrequency },
+                    }))
+                  }
+                >
+                  <option value="none">Does not repeat</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </label>
+              {formState.recurrence.frequency !== 'none' && (
+                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                  Ends (optional)
+                  <input
+                    type="date"
+                    className={fieldClasses(false)}
+                    value={formState.recurrence.until}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        recurrence: { ...prev.recurrence, until: event.target.value },
+                      }))
+                    }
+                  />
+                </label>
+              )}
               <PrimaryButton type="submit" startIcon={<CalendarDays size={16} />}>Save Reminder</PrimaryButton>
               <SecondaryButton
                 type="button"

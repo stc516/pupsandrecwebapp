@@ -45,6 +45,11 @@ export interface Reminder {
   type: 'walk' | 'vet-appointment' | 'medication' | 'grooming' | 'other';
   title: string;
   dateTime: string; // ISO
+  recurrence?: {
+    frequency: 'none' | 'daily' | 'weekly' | 'monthly';
+    interval?: number; // every N periods
+    until?: string; // ISO end date
+  };
 }
 
 export type AchievementCondition =

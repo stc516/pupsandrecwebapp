@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Pencil, PlusCircle, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
+import { addDays, format, startOfDay } from 'date-fns';
 
 import { Card } from '../../components/ui/Card';
 import { PrimaryButton, SecondaryButton } from '../../components/ui/Button';
@@ -53,6 +54,38 @@ export const ActivityPage = () => {
     () => activities.filter((activity) => activity.petId === selectedPetId),
     [activities, selectedPetId],
   );
+
+  const weeklyStats = useMemo(() => {
+    const today = startOfDay(new Date());
+    const days = Array.from({ length: 7 }).map((_, idx) => {
+      const date = addDays(today, -(6 - idx));
+      const matches = selectedActivities.filter((activity) => startOfDay(new Date(activity.date)).getTime() === date.getTime());
+      const minutes = matches.reduce((sum, a) => sum + (a.durationMinutes ?? 0), 0);
+      return {
+        label: format(date, 'EEE'),
+        minutes,
+        count: matches.length,
+      };
+    });
+    const totalMinutes = days.reduce((sum, d) => sum + d.minutes, 0);
+    const totalCount = days.reduce((sum, d) => sum + d.count, 0);
+    const maxMinutes = Math.max(...days.map((d) => d.minutes), 30); // avoid zero height
+    return { days, totalMinutes, totalCount, maxMinutes };
+  }, [selectedActivities]);
+
+  const currentStreak = useMemo(() => {
+    if (selectedActivities.length === 0) return 0;
+    const daySet = new Set(
+      selectedActivities.map((activity) => startOfDay(new Date(activity.date)).getTime()),
+    );
+    let streak = 0;
+    let cursor = startOfDay(new Date());
+    while (daySet.has(cursor.getTime())) {
+      streak += 1;
+      cursor = addDays(cursor, -1);
+    }
+    return streak;
+  }, [selectedActivities]);
 
   useEffect(() => {
     setFormState((prev) => ({ ...prev, petId: selectedPetId }));
@@ -172,7 +205,53 @@ export const ActivityPage = () => {
         </SecondaryButton>
       }
     >
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="space-y-4">
+        <Card padding="lg">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-brand-primary">Weekly Activity</h3>
+              <p className="text-sm text-text-secondary">Last 7 days summary</p>
+            </div>
+            <div className="flex gap-2">
+              <TagChip variant="accent">{weeklyStats.totalCount} logs</TagChip>
+              <TagChip className="bg-emerald-50 text-emerald-700">{weeklyStats.totalMinutes} min</TagChip>
+              <TagChip>Streak: {currentStreak}d</TagChip>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl bg-brand-ice/60 p-3 text-sm">
+              <p className="text-text-muted">This week</p>
+              <p className="text-lg font-semibold text-brand-primary">{weeklyStats.totalMinutes} minutes</p>
+            </div>
+            <div className="rounded-2xl bg-brand-ice/60 p-3 text-sm">
+              <p className="text-text-muted">Sessions</p>
+              <p className="text-lg font-semibold text-brand-primary">{weeklyStats.totalCount} activities</p>
+            </div>
+            <div className="rounded-2xl bg-brand-ice/60 p-3 text-sm">
+              <p className="text-text-muted">Current streak</p>
+              <p className="text-lg font-semibold text-brand-primary">{currentStreak} days</p>
+            </div>
+          </div>
+          <div className="mt-5 flex items-end gap-2">
+            {weeklyStats.days.map((day) => {
+              const barHeight = Math.max(16, (day.minutes / weeklyStats.maxMinutes) * 80);
+              return (
+                <div key={day.label} className="flex flex-1 flex-col items-center gap-2 text-xs text-text-secondary">
+                  <div className="flex h-20 w-full items-end">
+                    <div
+                      className="w-full rounded-full bg-brand-accent/20"
+                      style={{ height: barHeight }}
+                      title={`${day.label}: ${day.minutes} min (${day.count} logs)`}
+                    />
+                  </div>
+                  <span className="font-semibold text-brand-primary">{day.count}</span>
+                  <span>{day.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+        <div className="grid gap-4 md:grid-cols-5">
         <Card className="md:col-span-2" padding="lg">
           <h3 className="text-lg font-semibold text-brand-primary">Add Activity</h3>
           <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
@@ -435,6 +514,7 @@ export const ActivityPage = () => {
             )}
           </div>
         </Card>
+      </div>
       </div>
     </PageLayout>
   );
