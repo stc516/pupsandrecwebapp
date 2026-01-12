@@ -59,7 +59,9 @@ const occursOnDate = (reminder: Reminder, date: Date) => {
 const recurrenceLabel = (recurrence?: Reminder['recurrence']) => {
   if (!recurrence || recurrence.frequency === 'none') return null;
   const { frequency, interval = 1, until } = recurrence;
-  const label = `${frequency}${interval > 1 ? ` every ${interval}` : ''}`.replace('daily', 'Daily').replace('weekly', 'Weekly').replace('monthly', 'Monthly');
+  const freqLabel =
+    frequency === 'daily' ? 'Daily' : frequency === 'weekly' ? 'Weekly' : frequency === 'monthly' ? 'Monthly' : '';
+  const label = interval > 1 ? `${freqLabel} · every ${interval}` : freqLabel;
   const untilLabel = until ? ` until ${formatDate(new Date(until))}` : '';
   return `${label}${untilLabel}`;
 };
@@ -115,9 +117,10 @@ export const CalendarPage = () => {
 
   const buildRecurrencePayload = (recurrenceState: typeof formState['recurrence']) => {
     if (!recurrenceState || recurrenceState.frequency === 'none') return undefined;
+    const interval = Number(recurrenceState.interval) || 1;
     return {
       frequency: recurrenceState.frequency,
-      interval: recurrenceState.interval || 1,
+      interval,
       until: recurrenceState.until || undefined,
     } satisfies Reminder['recurrence'];
   };
@@ -366,20 +369,37 @@ export const CalendarPage = () => {
                   </select>
                 </label>
                 {editState.recurrence.frequency !== 'none' && (
-                  <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                    Ends (optional)
-                    <input
-                      type="date"
-                      className={fieldClasses(false)}
-                      value={editState.recurrence.until}
-                      onChange={(event) =>
-                        setEditState((prev) => ({
-                          ...prev,
-                          recurrence: { ...prev.recurrence, until: event.target.value },
-                        }))
-                      }
-                    />
-                  </label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                      Every
+                      <input
+                        type="number"
+                        min={1}
+                        className={fieldClasses(false)}
+                        value={editState.recurrence.interval}
+                        onChange={(event) =>
+                          setEditState((prev) => ({
+                            ...prev,
+                            recurrence: { ...prev.recurrence, interval: Number(event.target.value) || 1 },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                      Ends (optional)
+                      <input
+                        type="date"
+                        className={fieldClasses(false)}
+                        value={editState.recurrence.until}
+                        onChange={(event) =>
+                          setEditState((prev) => ({
+                            ...prev,
+                            recurrence: { ...prev.recurrence, until: event.target.value },
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
                 )}
                 <PrimaryButton type="submit" startIcon={<CalendarDays size={16} />}>Save changes</PrimaryButton>
               </form>
@@ -442,20 +462,37 @@ export const CalendarPage = () => {
                 </select>
               </label>
               {formState.recurrence.frequency !== 'none' && (
-                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                  Ends (optional)
-                  <input
-                    type="date"
-                    className={fieldClasses(false)}
-                    value={formState.recurrence.until}
-                    onChange={(event) =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        recurrence: { ...prev.recurrence, until: event.target.value },
-                      }))
-                    }
-                  />
-                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                    Every
+                    <input
+                      type="number"
+                      min={1}
+                      className={fieldClasses(false)}
+                      value={formState.recurrence.interval}
+                      onChange={(event) =>
+                        setFormState((prev) => ({
+                          ...prev,
+                          recurrence: { ...prev.recurrence, interval: Number(event.target.value) || 1 },
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                    Ends (optional)
+                    <input
+                      type="date"
+                      className={fieldClasses(false)}
+                      value={formState.recurrence.until}
+                      onChange={(event) =>
+                        setFormState((prev) => ({
+                          ...prev,
+                          recurrence: { ...prev.recurrence, until: event.target.value },
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
               )}
               <PrimaryButton type="submit" startIcon={<CalendarDays size={16} />}>Save Reminder</PrimaryButton>
               <SecondaryButton

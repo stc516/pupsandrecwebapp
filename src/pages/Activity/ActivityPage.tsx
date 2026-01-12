@@ -55,6 +55,18 @@ export const ActivityPage = () => {
     [activities, selectedPetId],
   );
 
+  const typeBreakdown = useMemo(() => {
+    const counts = typeOptions.map((type) => ({
+      type,
+      count: selectedActivities.filter((a) => a.type === type).length,
+    }));
+    const total = counts.reduce((sum, item) => sum + item.count, 0) || 1;
+    return counts.map((item) => ({
+      ...item,
+      percent: Math.round((item.count / total) * 100),
+    }));
+  }, [selectedActivities]);
+
   const weeklyStats = useMemo(() => {
     const today = startOfDay(new Date());
     const days = Array.from({ length: 7 }).map((_, idx) => {
@@ -249,6 +261,29 @@ export const ActivityPage = () => {
                 </div>
               );
             })}
+          </div>
+        </Card>
+        <Card padding="lg">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-brand-primary">Activity Types</h3>
+              <p className="text-sm text-text-secondary">Last 7 days by type</p>
+            </div>
+          </div>
+          <div className="mt-4 space-y-3">
+            {typeBreakdown.map((item) => (
+              <div key={item.type} className="flex items-center gap-3">
+                <span className="w-20 text-sm font-semibold capitalize text-brand-primary">{item.type}</span>
+                <div className="flex-1 rounded-full bg-brand-subtle">
+                  <div
+                    className="rounded-full bg-brand-accent py-1 text-[11px] font-semibold text-white"
+                    style={{ width: `${item.percent}%` }}
+                  >
+                    <span className="px-2">{item.count} • {item.percent}%</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
         <div className="grid gap-4 md:grid-cols-5">
