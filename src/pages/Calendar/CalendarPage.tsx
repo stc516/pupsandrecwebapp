@@ -150,7 +150,7 @@ export const CalendarPage = () => {
             </button>
           </div>
           <div className="overflow-x-auto pb-2 sm:pb-0">
-            <div className="min-w-[28rem]">
+            <div className="min-w-full sm:min-w-[26rem]">
               <div className="grid grid-cols-7 text-center text-xs font-semibold text-text-secondary">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                   <div key={day} className="py-2">
@@ -158,7 +158,7 @@ export const CalendarPage = () => {
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
                 {monthMatrix.flat().map((day) => {
                   const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
                   const isSelected = sameDay(day, selectedDate);
@@ -168,7 +168,7 @@ export const CalendarPage = () => {
                   return (
                     <button
                       key={day.toISOString()}
-                      className={`flex h-16 flex-col items-center justify-center rounded-2xl border text-sm font-semibold transition ${
+                      className={`flex h-14 sm:h-16 flex-col items-center justify-center rounded-2xl border text-sm font-semibold transition ${
                         isSelected
                           ? 'border-brand-accent bg-brand-accent/10 text-brand-accent'
                           : 'border-brand-border bg-white text-brand-primary'
