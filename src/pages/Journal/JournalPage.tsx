@@ -42,6 +42,7 @@ type FilterState = {
   category: 'all' | JournalCategory;
   tag: string;
   query: string;
+  sort: 'newest' | 'oldest';
 };
 
 type JournalFormState = {
@@ -171,6 +172,7 @@ export const JournalPage = () => {
     category: 'all',
     tag: '',
     query: '',
+    sort: 'newest',
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [formState, setFormState] = useState<JournalFormState>(() => createInitialFormState());
@@ -184,7 +186,7 @@ export const JournalPage = () => {
   }, [selectedPetId]);
 
   const filteredEntries = useMemo(() => {
-    return journalEntries.filter((entry) => {
+    const filtered = journalEntries.filter((entry) => {
       if (filters.pet !== 'all' && entry.petId !== filters.pet) return false;
       if (filters.category !== 'all' && entry.category !== filters.category) return false;
       if (
@@ -203,6 +205,11 @@ export const JournalPage = () => {
       }
       return true;
     });
+    return filtered.sort((a, b) =>
+      filters.sort === 'newest'
+        ? new Date(b.date).getTime() - new Date(a.date).getTime()
+        : new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
   }, [journalEntries, filters]);
 
   const entriesForInsights = useMemo(
@@ -521,7 +528,7 @@ const JournalFilters = ({
         Filters
       </button>
     </div>
-    <div className={clsx('grid gap-3 md:grid-cols-4', !filtersOpen && 'hidden md:grid')}>
+    <div className={clsx('grid gap-3 md:grid-cols-5', !filtersOpen && 'hidden md:grid')}>
       <div className="flex items-center gap-3 rounded-2xl border border-brand-border bg-white px-3 py-2">
         <img
           src={getPetAvatar(activePet)}
@@ -600,6 +607,34 @@ const JournalFilters = ({
             onChange={(event) => onChangeFilter({ query: event.target.value })}
           />
         </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 rounded-2xl border border-brand-border bg-white px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-text-secondary">Sort</span>
+          <select
+            className="rounded-full border border-brand-border px-3 py-1 text-xs font-semibold text-brand-primary focus:outline-none"
+            value={filters.sort}
+            onChange={(event) => onChangeFilter({ sort: event.target.value as FilterState['sort'] })}
+          >
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+          </select>
+        </div>
+        <button
+          type="button"
+          className="text-xs font-semibold text-brand-primary underline-offset-4 hover:underline"
+          onClick={() =>
+            onChangeFilter({
+              pet: 'all',
+              category: 'all',
+              tag: '',
+              query: '',
+              sort: 'newest',
+            })
+          }
+        >
+          Clear
+        </button>
       </div>
     </div>
   </Card>

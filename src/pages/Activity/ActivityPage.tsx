@@ -71,6 +71,12 @@ export const ActivityPage = () => {
     });
   }, [selectedActivities, typeFilter, rangeFilter]);
 
+  const filteredTotals = useMemo(() => {
+    const minutes = filteredActivities.reduce((sum, a) => sum + (a.durationMinutes ?? 0), 0);
+    const distance = filteredActivities.reduce((sum, a) => sum + (a.distanceKm ?? 0), 0);
+    return { minutes, distance };
+  }, [filteredActivities]);
+
   const last7Activities = useMemo(() => {
     const cutoff = addDays(startOfDay(new Date()), -6).getTime();
     return selectedActivities.filter(
@@ -583,6 +589,10 @@ export const ActivityPage = () => {
               <TagChip variant="accent">
                 {filteredActivities.length} / {selectedActivities.length} shown
               </TagChip>
+              <TagChip className="bg-emerald-50 text-emerald-700">
+                {filteredTotals.minutes} min
+                {filteredTotals.distance ? ` · ${filteredTotals.distance} km` : ''}
+              </TagChip>
             </div>
           </div>
           <div className="mt-4 space-y-3">
@@ -625,6 +635,11 @@ export const ActivityPage = () => {
                 </div>
               </div>
             ))}
+            {filteredActivities.length === 0 && (
+              <p className="rounded-2xl bg-brand-subtle p-4 text-sm text-text-secondary">
+                No activities match these filters yet. Try another type or range.
+              </p>
+            )}
             {selectedActivities.length === 0 && (
               <p className="rounded-2xl bg-brand-subtle p-4 text-sm text-text-secondary">No activities yet for this pup. Start one today!</p>
             )}
