@@ -232,6 +232,7 @@ export const CalendarPage = () => {
                 {monthMatrix.flat().map((day) => {
                   const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
                   const isSelected = sameDay(day, selectedDate);
+                  const isToday = sameDay(day, new Date());
                   const matches = reminders.filter((reminder) => reminder.petId === selectedPetId && occursOnDate(reminder, day));
                   const hasRecurring = matches.some(
                     (reminder) => reminder.recurrence && reminder.recurrence.frequency !== 'none',
@@ -243,8 +244,11 @@ export const CalendarPage = () => {
                         isSelected
                           ? 'border-brand-accent bg-brand-accent/10 text-brand-accent'
                           : 'border-brand-border bg-white text-brand-primary'
-                      } ${isCurrentMonth ? '' : 'text-text-muted'}`}
+                      } ${isCurrentMonth ? '' : 'text-text-muted'} ${isToday ? 'ring-1 ring-brand-accent/30' : ''}`}
                       onClick={() => setSelectedDate(day)}
+                      aria-label={`${formatDate(day)}${matches.length ? `, ${matches.length} reminder${matches.length === 1 ? '' : 's'}` : ''}${
+                        hasRecurring ? ', repeating reminders present' : ''
+                      }${isToday ? ', today' : ''}`}
                     >
                       <span className="flex items-center gap-1">
                         <span>{day.getDate()}</span>
