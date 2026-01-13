@@ -6,9 +6,9 @@ import { useAuth } from '../../hooks/useAuth';
 
 export const SignupPage = () => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const { user, login, isLoading, isAuthReady } = useAuth();
+  const [sent, setSent] = useState(false);
+  const { user, loginWithMagicLink, loginWithGoogle, isLoading, isAuthReady } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,8 +25,8 @@ export const SignupPage = () => {
     event.preventDefault();
     setError(null);
     try {
-      await login(email, password);
-      navigate('/');
+      await loginWithMagicLink(email);
+      setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     }
@@ -53,26 +53,24 @@ export const SignupPage = () => {
             />
           </label>
 
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">Password</span>
-            <input
-              type="password"
-              minLength={6}
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 outline-none ring-brand-primary/20 focus:border-brand-primary focus:ring-4"
-            />
-          </label>
-
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {sent ? <p className="text-sm text-emerald-600">Check your email for a magic link.</p> : null}
 
           <button
             type="submit"
             disabled={isLoading}
             className="w-full rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:bg-brand-primary/60"
           >
-            {isLoading ? 'Creating account…' : 'Sign up'}
+            {isLoading ? 'Sending link…' : 'Send magic link'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => loginWithGoogle()}
+            disabled={isLoading}
+            className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-brand-primary transition hover:bg-brand-subtle disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            Continue with Google
           </button>
         </form>
 

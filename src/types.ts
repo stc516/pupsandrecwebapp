@@ -9,6 +9,7 @@ export interface HealthRecord {
 
 export interface Pet {
   id: PetId;
+  userId?: string;
   name: string;
   breed: string;
   ageYears?: number;
@@ -19,6 +20,7 @@ export interface Pet {
 
 export interface Activity {
   id: string;
+  userId?: string;
   petId: PetId;
   type: 'walk' | 'park' | 'training' | 'play' | 'other';
   date: string; // ISO
@@ -30,6 +32,7 @@ export interface Activity {
 
 export interface JournalEntry {
   id: string;
+  userId?: string;
   petId: PetId;
   date: string;
   title: string;
@@ -41,6 +44,7 @@ export interface JournalEntry {
 
 export interface Reminder {
   id: string;
+  userId?: string;
   petId: PetId;
   type: 'walk' | 'vet-appointment' | 'medication' | 'grooming' | 'other';
   title: string;

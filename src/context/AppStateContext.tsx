@@ -8,14 +8,9 @@ import {
   useRef,
   type ReactNode,
 } from 'react';
-import { nanoid } from 'nanoid';
 import { addDays, parseISO, startOfDay } from 'date-fns';
+import { nanoid } from 'nanoid';
 
-import { activities as seedActivities } from '../data/activities';
-import { achievements as achievementCatalog } from '../data/achievements';
-import { journalEntries as seedJournal } from '../data/journal';
-import { pets as seedPets } from '../data/pets';
-import { reminders as seedReminders } from '../data/reminders';
 import { useAuth } from '../hooks/useAuth';
 import type {
   AchievementProgress,
@@ -28,8 +23,20 @@ import type {
   Reminder,
 } from '../types';
 import { getXpForActivity, hasPhoto, XP_PER_JOURNAL_ENTRY } from '../utils/xp';
-
-const STORAGE_KEY = 'pups-rec-state-v1';
+import { fetchPets, createPet, updatePetById, deletePetById } from '../lib/api/pets';
+import {
+  fetchReminders,
+  createReminder,
+  updateReminderById,
+  deleteReminderById,
+} from '../lib/api/reminders';
+import { fetchActivities, createActivity, updateActivityById, deleteActivityById } from '../lib/api/activities';
+import {
+  fetchJournalEntries,
+  createJournalEntry,
+  updateJournalEntryById,
+  deleteJournalEntryById,
+} from '../lib/api/journal';
 
 interface AppState {
   pets: Pet[];
@@ -43,19 +50,14 @@ interface AppState {
 }
 
 const defaultPreferences: PreferencesState = {
-  email: 'maggie@pupsandrec.com',
+  email: '',
   dailyReminders: true,
   activityNotifications: true,
   profileVisibility: true,
   shareDataWithFriends: false,
 };
 
-const buildAchievementState = (): AchievementProgress[] =>
-  achievementCatalog.map((achievement) => ({
-    ...achievement,
-    unlocked: false,
-    progress: 0,
-  }));
+const buildAchievementState = (): AchievementProgress[] => [];
 
 type Action =
   | { type: 'set-selected-pet'; payload: PetId }
@@ -84,14 +86,28 @@ const sortActivities = (items: Activity[]) =>
 const sortJournal = (items: JournalEntry[]) =>
   [...items].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+const STORAGE_KEY = 'pups-rec-state-v2';
+
+const loadPersistedState = (): AppState | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+    return JSON.parse(stored) as AppState;
+  } catch (error) {
+    console.warn('Failed to parse saved state', error);
+    return null;
+  }
+};
+
 const baseState: AppState = {
-  pets: seedPets,
-  selectedPetId: seedPets[0]?.id ?? 'bailey',
-  activities: sortActivities(seedActivities),
-  journalEntries: sortJournal(seedJournal),
-  reminders: seedReminders,
+  pets: [],
+  selectedPetId: '',
+  activities: [],
+  journalEntries: [],
+  reminders: [],
   achievements: buildAchievementState(),
-  xp: 120,
+  xp: 0,
   preferences: defaultPreferences,
 };
 
@@ -164,24 +180,6 @@ const calculateProgress = (achievement: AchievementProgress, state: AppState) =>
     }
     default:
       return 0;
-  }
-};
-
-const loadPersistedState = (): AppState | null => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return null;
-    const parsed = JSON.parse(stored) as AppState;
-    const merged = {
-      ...baseState,
-      ...parsed,
-      achievements: parsed.achievements ?? baseState.achievements,
-    };
-    return merged;
-  } catch (error) {
-    console.warn('Failed to parse saved state', error);
-    return null;
   }
 };
 
@@ -344,25 +342,25 @@ const reducer = (state: AppState, action: Action): AppState => {
 interface AppStateContextValue extends AppState {
   selectedPet?: Pet;
   setSelectedPet: (petId: PetId) => void;
-  addActivity: (payload: Omit<Activity, 'id'>) => void;
-  updateActivity: (payload: { id: string; updates: Partial<Omit<Activity, 'id'>> }) => void;
-  deleteActivity: (id: string) => void;
-  addJournalEntry: (payload: Omit<JournalEntry, 'id'>) => void;
-  updateJournalEntry: (payload: { id: string; updates: Partial<Omit<JournalEntry, 'id'>> }) => void;
-  deleteJournalEntry: (id: string) => void;
-  addReminder: (payload: Omit<Reminder, 'id'>) => void;
-  updateReminder: (payload: { id: string; updates: Partial<Omit<Reminder, 'id'>> }) => void;
-  deleteReminder: (id: string) => void;
-  addPet: (payload: Omit<Pet, 'id'>) => void;
-  updatePet: (payload: Pet) => void;
-  deletePet: (petId: PetId) => void;
-  addHealthRecord: (payload: { petId: PetId; record: Omit<HealthRecord, 'id'> }) => void;
+  addActivity: (payload: Omit<Activity, 'id'>) => Promise<void>;
+  updateActivity: (payload: { id: string; updates: Partial<Omit<Activity, 'id'>> }) => Promise<void>;
+  deleteActivity: (id: string) => Promise<void>;
+  addJournalEntry: (payload: Omit<JournalEntry, 'id'>) => Promise<void>;
+  updateJournalEntry: (payload: { id: string; updates: Partial<Omit<JournalEntry, 'id'>> }) => Promise<void>;
+  deleteJournalEntry: (id: string) => Promise<void>;
+  addReminder: (payload: Omit<Reminder, 'id'>) => Promise<void>;
+  updateReminder: (payload: { id: string; updates: Partial<Omit<Reminder, 'id'>> }) => Promise<void>;
+  deleteReminder: (id: string) => Promise<void>;
+  addPet: (payload: Omit<Pet, 'id'>) => Promise<void>;
+  updatePet: (payload: Pet) => Promise<void>;
+  deletePet: (petId: PetId) => Promise<void>;
+  addHealthRecord: (payload: { petId: PetId; record: Omit<HealthRecord, 'id'> }) => Promise<void>;
   updateHealthRecord: (payload: {
     petId: PetId;
     recordId: string;
     updates: Partial<Omit<HealthRecord, 'id'>>;
-  }) => void;
-  deleteHealthRecord: (payload: { petId: PetId; recordId: string }) => void;
+  }) => Promise<void>;
+  deleteHealthRecord: (payload: { petId: PetId; recordId: string }) => Promise<void>;
   completeActionAndGrantXP: (xp: number) => void;
   updatePreferences: (prefs: Partial<PreferencesState>) => void;
 }
@@ -393,63 +391,185 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     previousUserIdRef.current = user?.id ?? null;
   }, [user]);
 
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      if (!user) return;
+      try {
+        const [pets, activities, journalEntries, reminders] = await Promise.all([
+          fetchPets(user.id),
+          fetchActivities(user.id),
+          fetchJournalEntries(user.id),
+          fetchReminders(user.id),
+        ]);
+        if (!active) return;
+        dispatch({
+          type: 'hydrate',
+          payload: addAchievementXp({
+            pets,
+            selectedPetId: pets[0]?.id ?? '',
+            activities: sortActivities(activities),
+            journalEntries: sortJournal(journalEntries),
+            reminders,
+            achievements: buildAchievementState(),
+            xp: state.xp,
+            preferences: state.preferences,
+          }),
+        });
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load Supabase data', error);
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   const setSelectedPet = useCallback((petId: PetId) => {
     dispatch({ type: 'set-selected-pet', payload: petId });
   }, []);
 
-  const addActivity = useCallback((payload: Omit<Activity, 'id'>) => {
-    dispatch({ type: 'add-activity', payload: { ...payload, id: nanoid() } });
-  }, []);
-
-  const addJournalEntry = useCallback((payload: Omit<JournalEntry, 'id'>) => {
-    dispatch({ type: 'add-journal-entry', payload: { ...payload, id: nanoid() } });
-  }, []);
-
-  const addReminder = useCallback((payload: Omit<Reminder, 'id'>) => {
-    dispatch({ type: 'add-reminder', payload: { ...payload, id: nanoid() } });
-  }, []);
-
-  const updateActivity = useCallback((payload: { id: string; updates: Partial<Omit<Activity, 'id'>> }) => {
-    dispatch({ type: 'update-activity', payload });
-  }, []);
-
-  const deleteActivity = useCallback((id: string) => {
-    dispatch({ type: 'delete-activity', payload: { id } });
-  }, []);
-
-  const updateJournalEntry = useCallback(
-    (payload: { id: string; updates: Partial<Omit<JournalEntry, 'id'>> }) => {
-      dispatch({ type: 'update-journal-entry', payload });
+  const addActivity = useCallback(
+    async (payload: Omit<Activity, 'id'>) => {
+      if (!user?.id) {
+        dispatch({ type: 'add-activity', payload: { ...payload, id: nanoid() } });
+        return;
+      }
+      const created = await createActivity({ ...payload, userId: user.id });
+      dispatch({ type: 'add-activity', payload: created });
     },
-    [],
+    [user?.id],
   );
 
-  const deleteJournalEntry = useCallback((id: string) => {
-    dispatch({ type: 'delete-journal-entry', payload: { id } });
-  }, []);
+  const addJournalEntry = useCallback(
+    async (payload: Omit<JournalEntry, 'id'>) => {
+      if (!user?.id) {
+        dispatch({ type: 'add-journal-entry', payload: { ...payload, id: nanoid() } });
+        return;
+      }
+      const created = await createJournalEntry({ ...payload, userId: user.id });
+      dispatch({ type: 'add-journal-entry', payload: created });
+    },
+    [user?.id],
+  );
 
-  const updateReminder = useCallback((payload: { id: string; updates: Partial<Omit<Reminder, 'id'>> }) => {
-    dispatch({ type: 'update-reminder', payload });
-  }, []);
+  const addReminder = useCallback(
+    async (payload: Omit<Reminder, 'id'>) => {
+      if (!user?.id) {
+        dispatch({ type: 'add-reminder', payload: { ...payload, id: nanoid() } });
+        return;
+      }
+      const created = await createReminder(user.id, payload);
+      dispatch({ type: 'add-reminder', payload: created });
+    },
+    [user?.id],
+  );
 
-  const deleteReminder = useCallback((id: string) => {
-    dispatch({ type: 'delete-reminder', payload: { id } });
-  }, []);
+  const updateActivity = useCallback(
+    async (payload: { id: string; updates: Partial<Omit<Activity, 'id'>> }) => {
+      if (!user?.id) {
+        dispatch({ type: 'update-activity', payload });
+        return;
+      }
+      const updated = await updateActivityById(payload.id, payload.updates);
+      dispatch({ type: 'update-activity', payload: { id: payload.id, updates: updated } });
+    },
+    [user?.id],
+  );
 
-  const addPet = useCallback((payload: Omit<Pet, 'id'>) => {
-    dispatch({ type: 'add-pet', payload: { ...payload, id: nanoid() } });
-  }, []);
+  const deleteActivity = useCallback(
+    async (id: string) => {
+      if (user?.id) {
+        await deleteActivityById(id);
+      }
+      dispatch({ type: 'delete-activity', payload: { id } });
+    },
+    [user?.id],
+  );
 
-  const updatePet = useCallback((payload: Pet) => {
-    dispatch({ type: 'update-pet', payload });
-  }, []);
+  const updateJournalEntry = useCallback(
+    async (payload: { id: string; updates: Partial<Omit<JournalEntry, 'id'>> }) => {
+      if (!user?.id) {
+        dispatch({ type: 'update-journal-entry', payload });
+        return;
+      }
+      const updated = await updateJournalEntryById(payload.id, payload.updates);
+      dispatch({ type: 'update-journal-entry', payload: { id: payload.id, updates: updated } });
+    },
+    [user?.id],
+  );
 
-  const deletePet = useCallback((petId: PetId) => {
-    dispatch({ type: 'delete-pet', payload: petId });
-  }, []);
+  const deleteJournalEntry = useCallback(
+    async (id: string) => {
+      if (user?.id) {
+        await deleteJournalEntryById(id);
+      }
+      dispatch({ type: 'delete-journal-entry', payload: { id } });
+    },
+    [user?.id],
+  );
+
+  const updateReminder = useCallback(
+    async (payload: { id: string; updates: Partial<Omit<Reminder, 'id'>> }) => {
+      if (!user?.id) {
+        dispatch({ type: 'update-reminder', payload });
+        return;
+      }
+      const updated = await updateReminderById(payload.id, payload.updates);
+      dispatch({ type: 'update-reminder', payload: { id: payload.id, updates: updated } });
+    },
+    [user?.id],
+  );
+
+  const deleteReminder = useCallback(
+    async (id: string) => {
+      if (user?.id) {
+        await deleteReminderById(id);
+      }
+      dispatch({ type: 'delete-reminder', payload: { id } });
+    },
+    [user?.id],
+  );
+
+  const addPet = useCallback(
+    async (payload: Omit<Pet, 'id'>) => {
+      if (!user?.id) {
+        dispatch({ type: 'add-pet', payload: { ...payload, id: nanoid() } });
+        return;
+      }
+      const created = await createPet(user.id, payload);
+      dispatch({ type: 'add-pet', payload: created });
+    },
+    [user?.id],
+  );
+
+  const updatePet = useCallback(
+    async (payload: Pet) => {
+      if (!user?.id) {
+        dispatch({ type: 'update-pet', payload });
+        return;
+      }
+      const updated = await updatePetById(payload.id, payload);
+      dispatch({ type: 'update-pet', payload: updated });
+    },
+    [user?.id],
+  );
+
+  const deletePet = useCallback(
+    async (petId: PetId) => {
+      if (user?.id) {
+        await deletePetById(petId);
+      }
+      dispatch({ type: 'delete-pet', payload: petId });
+    },
+    [user?.id],
+  );
 
   const addHealthRecord = useCallback(
-    (payload: { petId: PetId; record: Omit<HealthRecord, 'id'> }) => {
+    async (payload: { petId: PetId; record: Omit<HealthRecord, 'id'> }) => {
       dispatch({
         type: 'add-health-record',
         payload: {
@@ -462,13 +582,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const updateHealthRecord = useCallback(
-    (payload: { petId: PetId; recordId: string; updates: Partial<Omit<HealthRecord, 'id'>> }) => {
+    async (payload: { petId: PetId; recordId: string; updates: Partial<Omit<HealthRecord, 'id'>> }) => {
       dispatch({ type: 'update-health-record', payload });
     },
     [],
   );
 
-  const deleteHealthRecord = useCallback((payload: { petId: PetId; recordId: string }) => {
+  const deleteHealthRecord = useCallback(async (payload: { petId: PetId; recordId: string }) => {
     dispatch({ type: 'delete-health-record', payload });
   }, []);
 

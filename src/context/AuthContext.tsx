@@ -7,68 +7,33 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 
-const AUTH_STORAGE_KEY = 'pups-rec-auth-user';
+import { supabase } from '../lib/supabaseClient';
 
 export interface AuthUser {
   id: string;
   email: string;
-  name: string;
+  name?: string | null;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthReady: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  loginWithMagicLink: (email: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const simulateDelay = (duration = 400) =>
-  new Promise<void>((resolve) => {
-    setTimeout(resolve, duration);
-  });
-
-const readStoredUser = (): AuthUser | null => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const stored = window.localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!stored) return null;
-    return JSON.parse(stored) as AuthUser;
-  } catch (error) {
-    console.warn('Failed to read stored auth user', error);
-    return null;
-  }
-};
-
-const persistUser = (value: AuthUser | null) => {
-  if (typeof window === 'undefined') return;
-  if (value) {
-    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(value));
-  } else {
-    window.localStorage.removeItem(AUTH_STORAGE_KEY);
-  }
-};
-
-const createMockUser = (email: string): AuthUser => {
-  const localPart = email.split('@')[0] ?? 'pupslover';
-  const displayName =
-    localPart
-      .split(/[\.\-_]/)
-      .filter(Boolean)
-      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-      .join(' ')
-      .trim() || 'Pups Lover';
-  const id =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `mock-user-${Date.now()}`;
+const mapUser = (supabaseUser: User | null): AuthUser | null => {
+  if (!supabaseUser) return null;
   return {
-    id,
-    email,
-    name: displayName,
+    id: supabaseUser.id,
+    email: supabaseUser.email ?? '',
+    name: supabaseUser.user_metadata.full_name ?? supabaseUser.email ?? '',
   };
 };
 
@@ -78,33 +43,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setLoading] = useState(false);
 
   useEffect(() => {
-    const storedUser = readStoredUser();
-    if (storedUser) {
-      setUser(storedUser);
-    }
-    setAuthReady(true);
+    let mounted = true;
+    const bootstrap = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+      setUser(mapUser(data.session?.user ?? null));
+      setAuthReady(true);
+    };
+    bootstrap();
+    const { data: listener } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      setUser(mapUser(session?.user ?? null));
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+      setAuthReady(true);
+    });
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
-  const login = useCallback(async (email: string, _password: string) => {
+  const loginWithMagicLink = useCallback(async (email: string) => {
     setLoading(true);
     try {
-      await simulateDelay();
-      const normalizedEmail = email.trim().toLowerCase();
-      const mockUser = createMockUser(normalizedEmail);
-      setUser(mockUser);
-      persistUser(mockUser);
+      const { error } = await supabase.auth.signInWithOtp({ email });
+      if (error) throw error;
     } finally {
       setLoading(false);
-      setAuthReady(true);
+    }
+  }, []);
+
+  const loginWithGoogle = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+      if (error) throw error;
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   const logout = useCallback(async () => {
     setLoading(true);
     try {
-      await simulateDelay(250);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       setUser(null);
-      persistUser(null);
     } finally {
       setLoading(false);
     }
@@ -115,10 +100,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user,
       isAuthReady,
       isLoading,
-      login,
+      loginWithMagicLink,
+      loginWithGoogle,
       logout,
     }),
-    [isAuthReady, isLoading, login, logout, user],
+    [isAuthReady, isLoading, loginWithGoogle, loginWithMagicLink, logout, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
