@@ -12,12 +12,15 @@ const mapEntry = (row: any): JournalEntry => ({
   photoUrl: row.photo_url ?? '',
 });
 
-export const fetchJournalEntries = async (userId: string): Promise<JournalEntry[]> => {
-  const { data, error } = await supabase
+export const fetchJournalEntries = async (userId: string, petId?: string): Promise<JournalEntry[]> => {
+  let query = supabase
     .from('journal_entries')
     .select('*')
-    .eq('user_id', userId)
-    .order('date', { ascending: false });
+    .eq('user_id', userId);
+  if (petId) {
+    query = query.eq('pet_id', petId);
+  }
+  const { data, error } = await query.order('date', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(mapEntry);
 };

@@ -12,12 +12,15 @@ const mapActivity = (row: any): Activity => ({
   photoUrl: row.photo_url ?? '',
 });
 
-export const fetchActivities = async (userId: string): Promise<Activity[]> => {
-  const { data, error } = await supabase
+export const fetchActivities = async (userId: string, petId?: string): Promise<Activity[]> => {
+  let query = supabase
     .from('activities')
     .select('*')
-    .eq('user_id', userId)
-    .order('date', { ascending: false });
+    .eq('user_id', userId);
+  if (petId) {
+    query = query.eq('pet_id', petId);
+  }
+  const { data, error } = await query.order('date', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(mapActivity);
 };

@@ -10,12 +10,15 @@ const mapReminder = (row: any): Reminder => ({
   recurrence: row.recurrence ?? undefined,
 });
 
-export const fetchReminders = async (userId: string) => {
-  const { data, error } = await supabase
+export const fetchReminders = async (userId: string, petId?: string) => {
+  let query = supabase
     .from('reminders')
     .select('*')
-    .eq('user_id', userId)
-    .order('date_time', { ascending: true });
+    .eq('user_id', userId);
+  if (petId) {
+    query = query.eq('pet_id', petId);
+  }
+  const { data, error } = await query.order('date_time', { ascending: true });
   if (error) throw error;
   return (data ?? []).map(mapReminder);
 };
