@@ -343,7 +343,7 @@ const waitForSelector = async (selector: string, deadline: number, isCancelled: 
   return waitForCondition(() => document.querySelector(selector), deadline, isCancelled);
 };
 
-const waitForCondition = async <T>(
+const waitForCondition = async <T,>(
   check: () => T | null | false,
   deadline: number,
   isCancelled: () => boolean,
