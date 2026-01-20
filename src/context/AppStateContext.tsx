@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { addDays, parseISO, startOfDay } from 'date-fns';
 import { nanoid } from 'nanoid';
+import { supabase } from '../lib/supabaseClient';
 
 import { useAuth } from '../hooks/useAuth';
 import type {
@@ -341,7 +342,9 @@ const reducer = (state: AppState, action: Action): AppState => {
 
 interface AppStateContextValue extends AppState {
   selectedPet?: Pet;
-  setSelectedPet: (petId: PetId) => void;
+  setSelectedPet: (petId: PetId) => Promise<void>;
+  isOnboarded: boolean;
+  requirePet: () => void;
   addActivity: (payload: Omit<Activity, 'id'>) => Promise<void>;
   updateActivity: (payload: { id: string; updates: Partial<Omit<Activity, 'id'>> }) => Promise<void>;
   deleteActivity: (id: string) => Promise<void>;
@@ -351,7 +354,7 @@ interface AppStateContextValue extends AppState {
   addReminder: (payload: Omit<Reminder, 'id'>) => Promise<void>;
   updateReminder: (payload: { id: string; updates: Partial<Omit<Reminder, 'id'>> }) => Promise<void>;
   deleteReminder: (id: string) => Promise<void>;
-  addPet: (payload: Omit<Pet, 'id'>) => Promise<void>;
+  addPet: (payload: Omit<Pet, 'id'>) => Promise<Pet>;
   updatePet: (payload: Pet) => Promise<void>;
   deletePet: (petId: PetId) => Promise<void>;
   addHealthRecord: (payload: { petId: PetId; record: Omit<HealthRecord, 'id'> }) => Promise<void>;
@@ -379,6 +382,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
+  const isOnboarded = state.pets.length > 0;
+
   useEffect(() => {
     const wasLoggedIn = Boolean(previousUserIdRef.current);
     if (wasLoggedIn && !user) {
@@ -396,25 +401,49 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     const load = async () => {
       if (!user) return;
       try {
-        const [pets, activities, journalEntries, reminders] = await Promise.all([
-          fetchPets(user.id),
-          fetchActivities(user.id),
-          fetchJournalEntries(user.id),
-          fetchReminders(user.id),
+        const pets = await fetchPets(user.id);
+        if (!active) return;
+        const existingSelected = state.selectedPetId;
+        const selectedPetId =
+          (existingSelected && pets.some((pet) => pet.id === existingSelected) && existingSelected) ||
+          (user?.selectedPetId && pets.some((pet) => pet.id === user.selectedPetId) && user.selectedPetId) ||
+          pets[0]?.id ||
+          '';
+
+        if (!selectedPetId) {
+          dispatch({
+            type: 'hydrate',
+            payload: {
+              ...state,
+              pets,
+              selectedPetId: '',
+              activities: [],
+              journalEntries: [],
+              reminders: [],
+            },
+          });
+          return;
+        }
+
+        const [activities, journalEntries, reminders] = await Promise.all([
+          fetchActivities(user.id, selectedPetId),
+          fetchJournalEntries(user.id, selectedPetId),
+          fetchReminders(user.id, selectedPetId),
         ]);
         if (!active) return;
+        const nextState = addAchievementXp({
+          pets,
+          selectedPetId,
+          activities: sortActivities(activities),
+          journalEntries: sortJournal(journalEntries),
+          reminders,
+          achievements: buildAchievementState(),
+          xp: state.xp,
+          preferences: state.preferences,
+        });
         dispatch({
           type: 'hydrate',
-          payload: addAchievementXp({
-            pets,
-            selectedPetId: pets[0]?.id ?? '',
-            activities: sortActivities(activities),
-            journalEntries: sortJournal(journalEntries),
-            reminders,
-            achievements: buildAchievementState(),
-            xp: state.xp,
-            preferences: state.preferences,
-          }),
+          payload: nextState,
         });
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -426,52 +455,80 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, state.selectedPetId]);
 
-  const setSelectedPet = useCallback((petId: PetId) => {
+  const setSelectedPet = useCallback(
+    async (petId: PetId) => {
     dispatch({ type: 'set-selected-pet', payload: petId });
-  }, []);
+      if (user?.id) {
+        try {
+          await supabase.auth.updateUser({ data: { selectedPetId: petId } });
+        } catch (error) {
+          console.warn('Failed to persist selected pet', error);
+        }
+      }
+    },
+    [user?.id],
+  );
+
+  const requirePet = useCallback(() => {
+    if (!state.selectedPetId) {
+      throw new Error('Select a pet first.');
+    }
+  }, [state.selectedPetId]);
 
   const addActivity = useCallback(
     async (payload: Omit<Activity, 'id'>) => {
+      const petId = payload.petId ?? state.selectedPetId;
+      if (!petId) {
+        throw new Error('Select a pet first.');
+      }
       if (!user?.id) {
-        dispatch({ type: 'add-activity', payload: { ...payload, id: nanoid() } });
+        dispatch({ type: 'add-activity', payload: { ...payload, petId, id: nanoid() } });
         return;
       }
-      const created = await createActivity({ ...payload, userId: user.id });
+      const created = await createActivity({ ...payload, petId, userId: user.id });
       dispatch({ type: 'add-activity', payload: created });
     },
-    [user?.id],
+    [state.selectedPetId, user?.id],
   );
 
   const addJournalEntry = useCallback(
     async (payload: Omit<JournalEntry, 'id'>) => {
+      const petId = payload.petId ?? state.selectedPetId;
+      if (!petId) {
+        throw new Error('Select a pet first.');
+      }
       if (!user?.id) {
-        dispatch({ type: 'add-journal-entry', payload: { ...payload, id: nanoid() } });
+        dispatch({ type: 'add-journal-entry', payload: { ...payload, petId, id: nanoid() } });
         return;
       }
-      const created = await createJournalEntry({ ...payload, userId: user.id });
+      const created = await createJournalEntry({ ...payload, petId, userId: user.id });
       dispatch({ type: 'add-journal-entry', payload: created });
     },
-    [user?.id],
+    [state.selectedPetId, user?.id],
   );
 
   const addReminder = useCallback(
     async (payload: Omit<Reminder, 'id'>) => {
+      const petId = payload.petId ?? state.selectedPetId;
+      if (!petId) {
+        throw new Error('Select a pet first.');
+      }
       if (!user?.id) {
-        dispatch({ type: 'add-reminder', payload: { ...payload, id: nanoid() } });
+        dispatch({ type: 'add-reminder', payload: { ...payload, petId, id: nanoid() } });
         return;
       }
-      const created = await createReminder(user.id, payload);
+      const created = await createReminder(user.id, { ...payload, petId });
       dispatch({ type: 'add-reminder', payload: created });
     },
-    [user?.id],
+    [state.selectedPetId, user?.id],
   );
 
   const updateActivity = useCallback(
     async (payload: { id: string; updates: Partial<Omit<Activity, 'id'>> }) => {
       if (!user?.id) {
-        dispatch({ type: 'update-activity', payload });
+    dispatch({ type: 'update-activity', payload });
         return;
       }
       const updated = await updateActivityById(payload.id, payload.updates);
@@ -485,7 +542,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       if (user?.id) {
         await deleteActivityById(id);
       }
-      dispatch({ type: 'delete-activity', payload: { id } });
+    dispatch({ type: 'delete-activity', payload: { id } });
     },
     [user?.id],
   );
@@ -493,7 +550,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const updateJournalEntry = useCallback(
     async (payload: { id: string; updates: Partial<Omit<JournalEntry, 'id'>> }) => {
       if (!user?.id) {
-        dispatch({ type: 'update-journal-entry', payload });
+      dispatch({ type: 'update-journal-entry', payload });
         return;
       }
       const updated = await updateJournalEntryById(payload.id, payload.updates);
@@ -507,7 +564,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       if (user?.id) {
         await deleteJournalEntryById(id);
       }
-      dispatch({ type: 'delete-journal-entry', payload: { id } });
+    dispatch({ type: 'delete-journal-entry', payload: { id } });
     },
     [user?.id],
   );
@@ -515,7 +572,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const updateReminder = useCallback(
     async (payload: { id: string; updates: Partial<Omit<Reminder, 'id'>> }) => {
       if (!user?.id) {
-        dispatch({ type: 'update-reminder', payload });
+    dispatch({ type: 'update-reminder', payload });
         return;
       }
       const updated = await updateReminderById(payload.id, payload.updates);
@@ -529,7 +586,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       if (user?.id) {
         await deleteReminderById(id);
       }
-      dispatch({ type: 'delete-reminder', payload: { id } });
+    dispatch({ type: 'delete-reminder', payload: { id } });
     },
     [user?.id],
   );
@@ -537,11 +594,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const addPet = useCallback(
     async (payload: Omit<Pet, 'id'>) => {
       if (!user?.id) {
-        dispatch({ type: 'add-pet', payload: { ...payload, id: nanoid() } });
-        return;
+    dispatch({ type: 'add-pet', payload: { ...payload, id: nanoid() } });
+        const added = { ...payload, id: nanoid() };
+        return added as Pet;
       }
       const created = await createPet(user.id, payload);
       dispatch({ type: 'add-pet', payload: created });
+      return created;
     },
     [user?.id],
   );
@@ -549,7 +608,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const updatePet = useCallback(
     async (payload: Pet) => {
       if (!user?.id) {
-        dispatch({ type: 'update-pet', payload });
+    dispatch({ type: 'update-pet', payload });
         return;
       }
       const updated = await updatePetById(payload.id, payload);
@@ -563,7 +622,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       if (user?.id) {
         await deletePetById(petId);
       }
-      dispatch({ type: 'delete-pet', payload: petId });
+    dispatch({ type: 'delete-pet', payload: petId });
     },
     [user?.id],
   );
@@ -605,6 +664,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return {
       ...state,
       selectedPet,
+      isOnboarded,
+      requirePet,
       setSelectedPet,
       addActivity,
       addJournalEntry,
@@ -626,6 +687,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [
     state,
+    isOnboarded,
+    requirePet,
     setSelectedPet,
     addActivity,
     addJournalEntry,
