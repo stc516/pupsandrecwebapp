@@ -22,6 +22,7 @@ export const ActivityPage = () => {
   const {
     activities,
     selectedPetId,
+    selectedPet,
     pets,
     addActivity,
     updateActivity,
@@ -146,6 +147,12 @@ export const ActivityPage = () => {
     setFormState((prev) => ({ ...prev, petId: selectedPetId }));
   }, [selectedPetId]);
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.info(`[ActivityPage] selectedPetId=${selectedPetId} fetchedCount=${selectedActivities.length}`);
+  }, [selectedActivities.length, selectedPetId, selectedPet?.name]);
+
   const validateForm = (stateToValidate: typeof formState) => {
     const nextErrors: Record<string, string> = {};
     if (!stateToValidate.petId) {
@@ -175,7 +182,7 @@ export const ActivityPage = () => {
       hasError && 'border-red-300 focus-visible:outline-red-400',
     );
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const nextErrors = validateForm(formState);
     if (Object.keys(nextErrors).length > 0) {
@@ -183,18 +190,25 @@ export const ActivityPage = () => {
       pushToast({ tone: 'error', message: 'Please fix the highlighted fields.' });
       return;
     }
-    addActivity({
-      petId: formState.petId ?? selectedPetId,
-      type: formState.type,
-      date: new Date(formState.date).toISOString(),
-      durationMinutes: Number(formState.durationMinutes) || undefined,
-      distanceKm: Number(formState.distanceKm) || undefined,
-      notes: formState.notes,
-      photoUrl: formState.photoUrl,
-    });
-    setFormState((prev) => ({ ...prev, notes: '', photoUrl: '' }));
-    setErrors({});
-    pushToast({ tone: 'success', message: 'Activity saved.' });
+    try {
+      await addActivity({
+        petId: selectedPetId || formState.petId,
+        type: formState.type,
+        date: new Date(formState.date).toISOString(),
+        durationMinutes: Number(formState.durationMinutes) || undefined,
+        distanceKm: Number(formState.distanceKm) || undefined,
+        notes: formState.notes,
+        photoUrl: formState.photoUrl,
+      });
+      setFormState((prev) => ({ ...prev, notes: '', photoUrl: '' }));
+      setErrors({});
+      pushToast({ tone: 'success', message: 'Activity saved.' });
+    } catch (error) {
+      pushToast({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Select a pet first.',
+      });
+    }
   };
 
   const startEditing = (activity: Activity) => {
@@ -231,10 +245,18 @@ export const ActivityPage = () => {
         notes: editState.notes,
         photoUrl: editState.photoUrl,
       },
-    });
-    setEditingActivity(null);
-    setEditErrors({});
-    pushToast({ tone: 'success', message: 'Activity updated.' });
+    })
+      .then(() => {
+        setEditingActivity(null);
+        setEditErrors({});
+        pushToast({ tone: 'success', message: 'Activity updated.' });
+      })
+      .catch((error: unknown) => {
+        pushToast({
+          tone: 'error',
+          message: error instanceof Error ? error.message : 'Update failed. Select a pet first.',
+        });
+      });
   };
 
   const handleDeleteActivity = (activity: Activity) => {
@@ -641,7 +663,19 @@ export const ActivityPage = () => {
               </p>
             )}
             {selectedActivities.length === 0 && (
-              <p className="rounded-2xl bg-brand-subtle p-4 text-sm text-text-secondary">No activities yet for this pup. Start one today!</p>
+              <div className="space-y-2 rounded-2xl bg-brand-subtle p-4 text-sm text-text-secondary">
+                <p className="font-semibold text-brand-primary">No activities yet for this pet</p>
+                <p>Start tracking walks, training, and playtime.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="inline-flex w-fit items-center justify-center rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-primary/90"
+                >
+                  Create activity
+                </button>
+              </div>
             )}
           </div>
         </Card>

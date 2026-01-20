@@ -1,5 +1,4 @@
 import { Sparkles } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 import { useAppState } from '../hooks/useAppState';
 import { useAuth } from '../hooks/useAuth';
@@ -8,12 +7,12 @@ import { PetSwitcher } from './pet-switcher';
 
 export const TopBar = () => {
   const { xp } = useAppState();
-  const { user, logout, isLoading } = useAuth();
+  const { logout, isLoading } = useAuth();
   const level = calculateLevel(xp);
   const currentProgress = nextLevelProgress(xp);
 
   const handleLogout = () => {
-    logout().catch((error) => {
+    logout().catch((error: unknown) => {
       console.error('Failed to log out', error);
     });
   };
@@ -38,34 +37,19 @@ export const TopBar = () => {
             />
           </div>
         </div>
-        <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-brand-accent to-brand-accentDeep px-3 py-1 text-sm font-semibold text-white shadow">
+        <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-brand-accent to-brand-accentDeep px-3 py-1 text-sm font-semibold text-white shadow-sm">
           <Sparkles size={16} />
           <span>{xp} XP</span>
         </div>
         <div className="flex items-center gap-3">
-          {user ? (
-            <>
-              <div className="hidden flex-col text-right text-xs text-text-muted sm:flex">
-                <span className="font-semibold text-brand-primary">{user.email}</span>
-                <span>Signed in</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={isLoading}
-                className="rounded-full border border-brand-border px-3 py-1 text-sm font-semibold text-brand-primary transition hover:bg-brand-subtle disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Log out
-              </button>
-            </>
-          ) : (
-            <Link
-              to="/login"
-              className="rounded-full border border-brand-border px-3 py-1 text-sm font-semibold text-brand-primary transition hover:bg-brand-subtle"
-            >
-              Sign in
-            </Link>
-          )}
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={isLoading}
+            className="hidden rounded-full border border-brand-border px-3 py-1 text-sm font-semibold text-brand-primary transition hover:bg-brand-subtle disabled:cursor-not-allowed disabled:opacity-60 sm:inline-flex"
+          >
+            Log out
+          </button>
           <PetSwitcher />
         </div>
       </div>

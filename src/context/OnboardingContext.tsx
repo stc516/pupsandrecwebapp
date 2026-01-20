@@ -85,7 +85,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
     void supabase.auth
       .updateUser({ data: { onboarding: pickProgress(next) } })
-      .catch((error) => {
+      .catch((error: unknown) => {
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
           console.warn('Onboarding metadata update failed', error);

@@ -1,5 +1,5 @@
 import { addMonths, subMonths, differenceInCalendarDays, differenceInCalendarMonths, startOfDay } from 'date-fns';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Pencil, Repeat, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
@@ -70,10 +70,12 @@ export const CalendarPage = () => {
   const {
     reminders,
     selectedPetId,
+    pets,
     addReminder,
     updateReminder,
     deleteReminder,
   } = useAppState();
+  const selectedPet = pets.find((pet) => pet.id === selectedPetId) ?? null;
   const { pushToast } = useToast();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -97,6 +99,12 @@ export const CalendarPage = () => {
   const dayReminders = reminders.filter(
     (reminder) => reminder.petId === selectedPetId && occursOnDate(reminder, selectedDate),
   );
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.info(`[CalendarPage] selectedPetId=${selectedPetId} fetchedCount=${reminders.length}`);
+  }, [reminders.length, selectedPetId]);
 
   const fieldClasses = (hasError: boolean) =>
     clsx(
@@ -140,10 +148,18 @@ export const CalendarPage = () => {
       title: formState.title,
       dateTime: new Date(formState.dateTime).toISOString(),
       recurrence: buildRecurrencePayload(formState.recurrence),
-    });
-    setFormState((prev) => ({ ...prev, title: '', recurrence: { ...defaultRecurrence } }));
-    setErrors({});
-    pushToast({ tone: 'success', message: 'Reminder added.' });
+    })
+      .then(() => {
+        setFormState((prev) => ({ ...prev, title: '', recurrence: { ...defaultRecurrence } }));
+        setErrors({});
+        pushToast({ tone: 'success', message: 'Reminder added.' });
+      })
+      .catch((error: unknown) => {
+        pushToast({
+          tone: 'error',
+          message: error instanceof Error ? error.message : 'Select a pet first.',
+        });
+      });
   };
 
   const startEditingReminder = (reminderId: string) => {
@@ -178,11 +194,19 @@ export const CalendarPage = () => {
         type: editState.type,
         title: editState.title,
         dateTime: new Date(editState.dateTime).toISOString(),
-          recurrence: buildRecurrencePayload(editState.recurrence),
+        recurrence: buildRecurrencePayload(editState.recurrence),
       },
-    });
-    setEditingReminderId(null);
-    pushToast({ tone: 'success', message: 'Reminder updated.' });
+    })
+      .then(() => {
+        setEditingReminderId(null);
+        pushToast({ tone: 'success', message: 'Reminder updated.' });
+      })
+      .catch((error: unknown) => {
+        pushToast({
+          tone: 'error',
+          message: error instanceof Error ? error.message : 'Select a pet first.',
+        });
+      });
   };
 
   const handleDeleteReminder = (reminderId: string) => {
@@ -420,11 +444,30 @@ export const CalendarPage = () => {
                 );
               })}
               {dayReminders.length === 0 && (
-                <p className="rounded-2xl bg-brand-subtle p-4 text-sm text-text-secondary">No reminders for this date.</p>
+                <div className="space-y-2 rounded-2xl bg-brand-subtle p-4 text-sm text-text-secondary">
+                  <p className="font-semibold text-brand-primary">
+                    No reminders for {selectedPet?.name ?? 'this pet'} on this day.
+                  </p>
+                  <p>Keep walks, meds, and vet visits on track.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const form = document.querySelector('form[data-reminder-form="add"]') as HTMLFormElement | null;
+                      if (form) {
+                        form.scrollIntoView({ behavior: 'smooth' });
+                        const input = form.querySelector('input, select, textarea') as HTMLElement | null;
+                        if (input) input.focus();
+                      }
+                    }}
+                    className="inline-flex w-fit items-center justify-center rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-primary/90"
+                  >
+                    Add reminder
+                  </button>
+                </div>
               )}
             </div>
           </Card>
-          <Card padding="lg">
+          <Card padding="lg" data-reminder-form="add">
             <h3 className="text-lg font-semibold text-brand-primary">Add Reminder</h3>
             <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
               <label className="flex flex-col text-sm font-medium text-brand-primary/90">

@@ -159,7 +159,6 @@ export const TourManager = () => {
       setTargetEl(null);
       setResolvedStepId(null);
       setTargetRect(null);
-      setTooltipRect(null);
       setTooltipPlacement(null);
       setTourStatus('waitingForTarget');
     }

@@ -14,7 +14,7 @@ export const SettingsPage = () => {
   const accountEmail = user?.email ?? preferences.email;
 
   const handleLogout = () => {
-    logout().catch((error) => {
+    logout().catch((error: unknown) => {
       console.error('Failed to log out', error);
     });
   };
