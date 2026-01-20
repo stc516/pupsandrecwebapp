@@ -9,9 +9,12 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { ToastProvider } from './components/ui/ToastProvider';
 import { AuthProvider } from './context/AuthContext';
 import { AppStateProvider } from './context/AppStateContext';
+import { OnboardingProvider } from './context/OnboardingContext';
 import { ActivityPage } from './pages/Activity/ActivityPage';
 import LoginPage from './pages/Auth/LoginPage';
 import SignupPage from './pages/Auth/SignupPage';
+import AuthCallbackPage from './pages/Auth/AuthCallbackPage';
+import { SmokePage } from './pages/Smoke/SmokePage';
 import { AchievementsPage } from './pages/Achievements/AchievementsPage';
 import { CalendarPage } from './pages/Calendar/CalendarPage';
 import { FeedPage } from './pages/Feed/FeedPage';
@@ -19,12 +22,16 @@ import { HomePage } from './pages/Home/HomePage';
 import { JournalPage } from './pages/Journal/JournalPage';
 import { PetsPage } from './pages/Pets/PetsPage';
 import { SettingsPage } from './pages/Settings/SettingsPage';
+import { HealthPage } from './pages/Health/HealthPage';
 
 registerSW({ immediate: true });
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/signup', element: <SignupPage /> },
+  { path: '/auth/callback', element: <AuthCallbackPage /> },
+  { path: '/__health', element: <HealthPage /> },
+  { path: '/__smoke', element: <SmokePage /> },
   {
     path: '/',
     element: (
@@ -49,9 +56,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
       <AppStateProvider>
-        <ToastProvider>
-          <RouterProvider router={router} />
-        </ToastProvider>
+        <OnboardingProvider>
+          <ToastProvider>
+            <RouterProvider router={router} />
+          </ToastProvider>
+        </OnboardingProvider>
       </AppStateProvider>
     </AuthProvider>
   </StrictMode>,
