@@ -17,6 +17,7 @@ export const BottomNav = () => {
                   isActive && 'text-brand-accent'
                 )
               }
+              data-tour={`nav-${item.label.toLowerCase()}`}
             >
               <item.icon size={22} />
               <span className="mt-1">{item.label}</span>

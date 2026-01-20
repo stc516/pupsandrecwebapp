@@ -17,6 +17,7 @@ export const SidebarNav = () => (
               isActive && 'bg-brand-accent/10 text-brand-accent'
             )
           }
+          data-tour={`nav-${item.label.toLowerCase()}`}
         >
           <item.icon size={18} />
           {item.label}
