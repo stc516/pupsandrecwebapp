@@ -12,7 +12,7 @@ import { formatDate } from '../../utils/dates';
 import { useToast } from '../../components/ui/ToastProvider';
 import { PetAvatar } from '../../components/ui/PetAvatar';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../lib/supabaseClient';
+import { getSupabaseClient, supabaseConfigured } from '../../lib/supabaseClient';
 
 const healthOptions = ['vet-visit', 'vaccine', 'medication', 'injury', 'weight', 'other'] as const;
 
@@ -78,14 +78,21 @@ export const PetsPage = () => {
 
   const uploadAvatar = async (file: File, petId: string) => {
     if (!user) throw new Error('Sign in to upload a photo.');
+    if (!supabaseConfigured) throw new Error('Supabase is not configured.');
+    let client;
+    try {
+      client = getSupabaseClient();
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Supabase is not configured.');
+    }
     const fileExt = file.name.split('.').pop() ?? 'jpg';
     const filePath = `${user.id}/${petId}.${fileExt}`;
-    const { error } = await supabase.storage.from('pet-avatars').upload(filePath, file, {
+    const { error } = await client.storage.from('pet-avatars').upload(filePath, file, {
       upsert: true,
       cacheControl: '3600',
     });
     if (error) throw error;
-    const { data } = supabase.storage.from('pet-avatars').getPublicUrl(filePath);
+    const { data } = client.storage.from('pet-avatars').getPublicUrl(filePath);
     return data.publicUrl;
   };
 
