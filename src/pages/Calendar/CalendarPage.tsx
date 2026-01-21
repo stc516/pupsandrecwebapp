@@ -220,8 +220,9 @@ export const CalendarPage = () => {
   };
 
   return (
-    <PageLayout title="Calendar" subtitle="Plan your walks, vet visits, and reminders">
-      <div className="grid gap-4 lg:grid-cols-3">
+    <div data-tour="calendar-page">
+      <PageLayout title="Calendar" subtitle="Plan your walks, vet visits, and reminders">
+        <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2" padding="lg">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <button
@@ -570,7 +571,8 @@ export const CalendarPage = () => {
             </form>
           </Card>
         </div>
-      </div>
-    </PageLayout>
+        </div>
+      </PageLayout>
+    </div>
   );
 };

@@ -54,7 +54,7 @@ const steps: TourStep[] = [
     id: 'calendar',
     title: 'Set reminders',
     body: 'Never miss meds or appointments.',
-    selector: '[data-tour="nav-calendar"]',
+    selector: '[data-tour="calendar-page"]',
     route: '/calendar',
     placement: 'right',
   },
