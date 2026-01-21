@@ -38,7 +38,7 @@ const steps: TourStep[] = [
     id: 'activity',
     title: 'Log activities',
     body: 'Track walks, playtime, and training.',
-    selector: '[data-tour="nav-activity"]',
+    selector: '[data-tour="activity-page"]',
     route: '/activity',
     placement: 'right',
   },
@@ -46,7 +46,7 @@ const steps: TourStep[] = [
     id: 'journal',
     title: 'Write memories',
     body: 'Capture moments and milestones.',
-    selector: '[data-tour="nav-journal"]',
+    selector: '[data-tour="journal-page"]',
     route: '/journal',
     placement: 'right',
   },
@@ -60,10 +60,11 @@ const steps: TourStep[] = [
   },
 ];
 
-const TARGET_TIMEOUT_MS = 2500;
+const TARGET_TIMEOUT_MS = 1200;
 const WATCHDOG_DELAY_MS = 100;
 const VIEWPORT_PADDING = 12;
 const TOOLTIP_OFFSET = 12;
+const TOOLTIP_PLACEMENT_TIMEOUT_MS = 300;
 
 export const TourManager = () => {
   const { state, status, closeTour, nextStep, setLastStepIndex, setTourStatus } = useOnboarding();
@@ -135,12 +136,16 @@ export const TourManager = () => {
 
       if (!found) {
         if (stepIndex < maxStepIndex) {
-          pushToast({ tone: 'success', message: 'Skipped a tour step we could not find.' });
+          if (import.meta.env.DEV) {
+            pushToast({ tone: 'success', message: 'Skipped a tour step we could not find.' });
+          }
           await setLastStepIndex(stepIndex + 1);
           setTourStatus('waitingForTarget');
           return;
         }
-        pushToast({ tone: 'error', message: "Tour couldn't find the next step. Try again." });
+        if (import.meta.env.DEV) {
+          pushToast({ tone: 'error', message: "Tour couldn't find the next step. Try again." });
+        }
         await hardExitTour('missing_target');
         return;
       }
@@ -171,7 +176,7 @@ export const TourManager = () => {
   useEffect(() => {
     if (status !== 'active' || !targetEl) return;
     const interval = window.setInterval(() => {
-      if (!targetEl.isConnected) {
+      if (!targetEl.isConnected || !isTourTargetVisible(targetEl)) {
         setTargetEl(null);
         setResolvedStepId(null);
         setTargetRect(null);
@@ -183,12 +188,17 @@ export const TourManager = () => {
   }, [setTourStatus, status, targetEl]);
 
   const updatePositions = useCallback(() => {
-    if (!targetEl) {
+    if (!targetEl || !isTourTargetVisible(targetEl)) {
       setTargetRect(null);
       setTooltipPlacement(null);
       return;
     }
     const nextTargetRect = targetEl.getBoundingClientRect();
+    if (nextTargetRect.width <= 0 || nextTargetRect.height <= 0) {
+      setTargetRect(null);
+      setTooltipPlacement(null);
+      return;
+    }
     setTargetRect(nextTargetRect);
     const tooltipEl = tooltipRef.current;
     if (!tooltipEl) {
@@ -254,6 +264,20 @@ export const TourManager = () => {
     return () => window.clearTimeout(timer);
   }, [hardExitTour, isTargetResolved, status]);
 
+  useEffect(() => {
+    if (status !== 'active' || !isTargetResolved) return;
+    if (tooltipPlacement) return;
+    const timer = window.setTimeout(() => {
+      if (!tooltipPlacement) {
+        setTargetEl(null);
+        setResolvedStepId(null);
+        setTargetRect(null);
+        setTooltipPlacement(null);
+        setTourStatus('waitingForTarget');
+      }
+    }, TOOLTIP_PLACEMENT_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [isTargetResolved, status, tooltipPlacement, setTourStatus]);
   useEffect(() => {
     if (status === 'idle' || status === 'paused') return;
     if (stepIndex < 0 || stepIndex > maxStepIndex) {
@@ -343,7 +367,7 @@ const resolveTarget = async (
 };
 
 const waitForSelector = async (selector: string, deadline: number, isCancelled: () => boolean) => {
-  return waitForCondition(() => document.querySelector(selector), deadline, isCancelled);
+  return waitForCondition(() => pickVisibleTourTarget(selector), deadline, isCancelled);
 };
 
 const waitForCondition = async <T,>(
@@ -366,3 +390,22 @@ const waitForFrame = () =>
       window.setTimeout(() => resolve(), 0);
     });
   });
+
+const pickVisibleTourTarget = (selector: string) => {
+  const candidates = Array.from(document.querySelectorAll(selector));
+  for (const candidate of candidates) {
+    if (isTourTargetVisible(candidate)) return candidate;
+  }
+  return null;
+};
+
+const isTourTargetVisible = (el: Element | null): el is HTMLElement => {
+  if (!el || !(el instanceof HTMLElement)) return false;
+  const style = window.getComputedStyle(el);
+  if (!style) return false;
+  const opacity = Number.parseFloat(style.opacity || '1');
+  if (style.display === 'none' || style.visibility === 'hidden' || opacity === 0) return false;
+  if (el.getClientRects().length === 0) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+};

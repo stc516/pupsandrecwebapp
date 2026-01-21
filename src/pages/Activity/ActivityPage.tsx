@@ -270,19 +270,20 @@ export const ActivityPage = () => {
   };
 
   return (
-    <PageLayout
-      title="Activity Hub"
-      subtitle="Track walks, playdates, and milestones"
-      actions={
-        <SecondaryButton
-          type="button"
-          onClick={() => setFormState((prev) => ({ ...prev, date: new Date().toISOString().slice(0, 16) }))}
-        >
-          Now
-        </SecondaryButton>
-      }
-    >
-      <div className="space-y-4">
+    <div data-tour="activity-page">
+      <PageLayout
+        title="Activity Hub"
+        subtitle="Track walks, playdates, and milestones"
+        actions={
+          <SecondaryButton
+            type="button"
+            onClick={() => setFormState((prev) => ({ ...prev, date: new Date().toISOString().slice(0, 16) }))}
+          >
+            Now
+          </SecondaryButton>
+        }
+      >
+        <div className="space-y-4">
         <Card padding="lg">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -680,7 +681,8 @@ export const ActivityPage = () => {
           </div>
         </Card>
       </div>
-      </div>
-    </PageLayout>
+        </div>
+      </PageLayout>
+    </div>
   );
 };
