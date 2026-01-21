@@ -1,4 +1,4 @@
-import { supabase } from '../supabaseClient';
+import { getSupabaseClient } from '../supabaseClient';
 import type { Reminder } from '../../types';
 
 const mapReminder = (row: any): Reminder => ({
@@ -11,6 +11,7 @@ const mapReminder = (row: any): Reminder => ({
 });
 
 export const fetchReminders = async (userId: string, petId?: string) => {
+  const supabase = getSupabaseClient();
   let query = supabase
     .from('reminders')
     .select('*')
@@ -24,6 +25,7 @@ export const fetchReminders = async (userId: string, petId?: string) => {
 };
 
 export const createReminder = async (userId: string, payload: Omit<Reminder, 'id'>) => {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('reminders')
     .insert([
@@ -43,6 +45,7 @@ export const createReminder = async (userId: string, payload: Omit<Reminder, 'id
 };
 
 export const updateReminderById = async (id: string, updates: Partial<Omit<Reminder, 'id'>>) => {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('reminders')
     .update({
@@ -60,6 +63,7 @@ export const updateReminderById = async (id: string, updates: Partial<Omit<Remin
 };
 
 export const deleteReminderById = async (id: string) => {
+  const supabase = getSupabaseClient();
   const { error } = await supabase.from('reminders').delete().eq('id', id);
   if (error) throw error;
 };

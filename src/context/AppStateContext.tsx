@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { addDays, parseISO, startOfDay } from 'date-fns';
 import { nanoid } from 'nanoid';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, supabaseConfigured } from '../lib/supabaseClient';
 
 import { useAuth } from '../hooks/useAuth';
 import type {
@@ -460,7 +460,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const setSelectedPet = useCallback(
     async (petId: PetId) => {
     dispatch({ type: 'set-selected-pet', payload: petId });
-      if (user?.id) {
+      if (user?.id && supabaseConfigured && supabase) {
         try {
           await supabase.auth.updateUser({ data: { selectedPetId: petId } });
         } catch (error) {

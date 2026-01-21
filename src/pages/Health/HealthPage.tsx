@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, supabaseConfigError, supabaseConfigured } from '../../lib/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
 
 type ProbeResult =
@@ -11,12 +11,19 @@ type ProbeResult =
 export const HealthPage = () => {
   const { user, isAuthReady } = useAuth();
   const [probe, setProbe] = useState<ProbeResult>({ status: 'idle' });
-  const envLoaded = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+  const envLoaded = supabaseConfigured;
   const clientInit = Boolean(supabase);
 
   useEffect(() => {
     let active = true;
     const runProbe = async () => {
+      if (!supabase) {
+        setProbe({
+          status: 'error',
+          message: supabaseConfigError ?? 'Supabase is not configured.',
+        });
+        return;
+      }
       setProbe({ status: 'loading' });
       const { count, error } = await supabase.from('pets').select('id', { count: 'exact', head: true }).limit(1);
       if (!active) return;

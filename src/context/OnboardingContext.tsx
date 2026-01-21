@@ -10,7 +10,7 @@ import {
 } from 'react';
 
 import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, supabaseConfigured } from '../lib/supabaseClient';
 
 export type TourStatus = 'idle' | 'waitingForTarget' | 'active' | 'paused';
 
@@ -82,7 +82,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const persistProgress = useCallback((next: OnboardingState) => {
-    if (!user) return;
+    if (!user || !supabaseConfigured || !supabase) return;
     void supabase.auth
       .updateUser({ data: { onboarding: pickProgress(next) } })
       .catch((error: unknown) => {

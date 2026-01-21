@@ -1,5 +1,5 @@
 import type { JournalEntry } from '../../types';
-import { supabase } from '../supabaseClient';
+import { getSupabaseClient } from '../supabaseClient';
 
 const mapEntry = (row: any): JournalEntry => ({
   id: row.id,
@@ -13,6 +13,7 @@ const mapEntry = (row: any): JournalEntry => ({
 });
 
 export const fetchJournalEntries = async (userId: string, petId?: string): Promise<JournalEntry[]> => {
+  const supabase = getSupabaseClient();
   let query = supabase
     .from('journal_entries')
     .select('*')
@@ -26,6 +27,7 @@ export const fetchJournalEntries = async (userId: string, petId?: string): Promi
 };
 
 export const createJournalEntry = async (payload: Omit<JournalEntry, 'id'> & { userId: string }) => {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('journal_entries')
     .insert({
@@ -45,6 +47,7 @@ export const createJournalEntry = async (payload: Omit<JournalEntry, 'id'> & { u
 };
 
 export const updateJournalEntryById = async (id: string, updates: Partial<Omit<JournalEntry, 'id' | 'petId'>>) => {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('journal_entries')
     .update({
@@ -63,6 +66,7 @@ export const updateJournalEntryById = async (id: string, updates: Partial<Omit<J
 };
 
 export const deleteJournalEntryById = async (id: string) => {
+  const supabase = getSupabaseClient();
   const { error } = await supabase.from('journal_entries').delete().eq('id', id);
   if (error) throw error;
 };

@@ -1,5 +1,5 @@
 import type { Activity } from '../../types';
-import { supabase } from '../supabaseClient';
+import { getSupabaseClient } from '../supabaseClient';
 
 const mapActivity = (row: any): Activity => ({
   id: row.id,
@@ -13,6 +13,7 @@ const mapActivity = (row: any): Activity => ({
 });
 
 export const fetchActivities = async (userId: string, petId?: string): Promise<Activity[]> => {
+  const supabase = getSupabaseClient();
   let query = supabase
     .from('activities')
     .select('*')
@@ -26,6 +27,7 @@ export const fetchActivities = async (userId: string, petId?: string): Promise<A
 };
 
 export const createActivity = async (payload: Omit<Activity, 'id'> & { userId: string }) => {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('activities')
     .insert({
@@ -45,6 +47,7 @@ export const createActivity = async (payload: Omit<Activity, 'id'> & { userId: s
 };
 
 export const updateActivityById = async (id: string, updates: Partial<Omit<Activity, 'id' | 'petId'>>) => {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('activities')
     .update({
@@ -63,6 +66,7 @@ export const updateActivityById = async (id: string, updates: Partial<Omit<Activ
 };
 
 export const deleteActivityById = async (id: string) => {
+  const supabase = getSupabaseClient();
   const { error } = await supabase.from('activities').delete().eq('id', id);
   if (error) throw error;
 };

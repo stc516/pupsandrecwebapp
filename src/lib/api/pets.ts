@@ -1,4 +1,4 @@
-import { supabase } from '../supabaseClient';
+import { getSupabaseClient } from '../supabaseClient';
 import type { Pet } from '../../types';
 
 const mapPet = (row: any): Pet => ({
@@ -12,6 +12,7 @@ const mapPet = (row: any): Pet => ({
 });
 
 export const fetchPets = async (userId: string) => {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('pets')
     .select('*')
@@ -22,6 +23,7 @@ export const fetchPets = async (userId: string) => {
 };
 
 export const createPet = async (userId: string, payload: Omit<Pet, 'id' | 'healthRecords'>) => {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('pets')
     .insert([
@@ -42,6 +44,7 @@ export const createPet = async (userId: string, payload: Omit<Pet, 'id' | 'healt
 };
 
 export const updatePetById = async (id: string, updates: Partial<Omit<Pet, 'id' | 'healthRecords'>>) => {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('pets')
     .update({
@@ -59,6 +62,7 @@ export const updatePetById = async (id: string, updates: Partial<Omit<Pet, 'id' 
 };
 
 export const deletePetById = async (id: string) => {
+  const supabase = getSupabaseClient();
   const { error } = await supabase.from('pets').delete().eq('id', id);
   if (error) throw error;
 };

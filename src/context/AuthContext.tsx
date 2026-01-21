@@ -9,7 +9,7 @@ import {
 } from 'react';
 import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 
-import { supabase } from '../lib/supabaseClient';
+import { supabase, supabaseConfigError, supabaseConfigured } from '../lib/supabaseClient';
 
 export interface AuthUser {
   id: string;
@@ -60,11 +60,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAuthReady, setAuthReady] = useState(false);
   const [isLoading, setLoading] = useState(false);
+  const configErrorMessage = supabaseConfigError ?? 'Supabase is not configured.';
 
   useEffect(() => {
+    if (!supabaseConfigured || !supabase) {
+      setUser(null);
+      setAuthReady(true);
+      return;
+    }
+    const client = supabase;
     let mounted = true;
     const bootstrap = async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await client.auth.getSession();
       if (!mounted) return;
       setUser(mapUser(data.session?.user ?? null));
       setAuthReady(true);
@@ -78,7 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     bootstrap();
-    const { data: listener } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+    const { data: listener } = client.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       setUser(mapUser(session?.user ?? null));
       if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -110,6 +117,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const sendMagicLink = useCallback(async (email: string) => {
     setLoading(true);
     try {
+      if (!supabaseConfigured || !supabase) {
+        throw new Error(configErrorMessage);
+      }
       const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
       if (error) {
         throw new Error(error.message || 'Magic link sign-in failed. Check Supabase email settings.');
@@ -124,6 +134,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signInWithPassword = useCallback(async (email: string, password: string) => {
     setLoading(true);
     try {
+      if (!supabaseConfigured || !supabase) {
+        throw new Error(configErrorMessage);
+      }
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         throw new Error(error.message || 'Sign in failed. Check your email and password.');
@@ -138,6 +151,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUpWithPassword = useCallback(async (email: string, password: string) => {
     setLoading(true);
     try {
+      if (!supabaseConfigured || !supabase) {
+        throw new Error(configErrorMessage);
+      }
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) {
         throw new Error(error.message || 'Sign up failed. Check password requirements.');
@@ -152,6 +168,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginWithGoogle = useCallback(async () => {
     setLoading(true);
     try {
+      if (!supabaseConfigured || !supabase) {
+        throw new Error(configErrorMessage);
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo },
@@ -177,6 +196,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = useCallback(async () => {
     setLoading(true);
     try {
+      if (!supabaseConfigured || !supabase) {
+        setUser(null);
+        return;
+      }
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       setUser(null);

@@ -5,7 +5,7 @@ import { Card } from '../../components/ui/Card';
 import { PrimaryButton, SecondaryButton } from '../../components/ui/Button';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../components/ui/ToastProvider';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, supabaseConfigError } from '../../lib/supabaseClient';
 
 const SMOKE_ENABLED = import.meta.env.VITE_SMOKE_ENABLED === 'true';
 
@@ -30,7 +30,7 @@ export const SmokePage = () => {
   }, [isAuthReady, user, navigate]);
 
   const fetchCounts = async () => {
-    if (!user) return;
+    if (!user || !supabase) return;
     setLoadingCounts(true);
     try {
       const tableCounts = await Promise.all(
@@ -58,7 +58,7 @@ export const SmokePage = () => {
   }, [user?.id]);
 
   const seedDemoData = async () => {
-    if (!user) return;
+    if (!user || !supabase) return;
     setSeeding(true);
     try {
       const { data: petRows, error: petError } = await supabase
@@ -140,7 +140,7 @@ export const SmokePage = () => {
   };
 
   const clearData = async () => {
-    if (!user) return;
+    if (!user || !supabase) return;
     setClearing(true);
     try {
       const tables = ['reminders', 'activities', 'journal_entries', 'pets'];
@@ -165,6 +165,15 @@ export const SmokePage = () => {
       <div className="mx-auto max-w-2xl p-6 text-center text-sm text-text-secondary">
         <p className="text-lg font-semibold text-brand-primary">Not enabled</p>
         <p>Set VITE_SMOKE_ENABLED=true to use smoke tools.</p>
+      </div>
+    );
+  }
+
+  if (!supabase) {
+    return (
+      <div className="mx-auto max-w-2xl p-6 text-center text-sm text-text-secondary">
+        <p className="text-lg font-semibold text-brand-primary">Supabase not configured</p>
+        <p>{supabaseConfigError ?? 'Missing Supabase environment variables.'}</p>
       </div>
     );
   }
