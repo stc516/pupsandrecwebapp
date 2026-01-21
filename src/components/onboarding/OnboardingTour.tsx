@@ -144,16 +144,6 @@ export const TourManager = () => {
   }, [current, hardExitTour, navigate, pushToast, setTourStatus, status]);
 
   useEffect(() => {
-    if (status === 'active' && current && !isTargetResolved) {
-      setTargetEl(null);
-      setResolvedStepId(null);
-      setTargetRect(null);
-      setTooltipPlacement(null);
-      setTourStatus('waitingForTarget');
-    }
-  }, [current, isTargetResolved, setTourStatus, status]);
-
-  useEffect(() => {
     if (status !== 'active' || !current?.route) return;
     if (location.pathname !== current.route) {
       setTargetEl(null);
