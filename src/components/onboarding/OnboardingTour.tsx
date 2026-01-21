@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import { Card } from '../ui/Card';
 import { PrimaryButton, SecondaryButton } from '../ui/Button';
-import { useToast } from '../ui/ToastProvider';
 import { useOnboarding } from '../../context/OnboardingContext';
 import { getTooltipPlacement, type TooltipPlacement } from './positioning';
 
@@ -11,7 +10,7 @@ type TourStep = {
   id: string;
   title: string;
   body: string;
-  selector: string;
+  selector: string | string[];
   route?: string;
   placement?: 'right' | 'left' | 'top' | 'bottom';
 };
@@ -37,7 +36,7 @@ const steps: TourStep[] = [
     id: 'activity',
     title: 'Log activities',
     body: 'Track walks, playtime, and training.',
-    selector: '[data-tour="nav-activity"]',
+    selector: ['[data-tour="nav-activity-desktop"]', '[data-tour="nav-activity-mobile"]'],
     route: '/activity',
     placement: 'right',
   },
@@ -45,7 +44,7 @@ const steps: TourStep[] = [
     id: 'journal',
     title: 'Write memories',
     body: 'Capture moments and milestones.',
-    selector: '[data-tour="nav-journal"]',
+    selector: ['[data-tour="nav-journal-desktop"]', '[data-tour="nav-journal-mobile"]'],
     route: '/journal',
     placement: 'right',
   },
@@ -53,20 +52,21 @@ const steps: TourStep[] = [
     id: 'calendar',
     title: 'Set reminders',
     body: 'Never miss meds or appointments.',
-    selector: '[data-tour="nav-calendar"]',
+    selector: ['[data-tour="nav-calendar-desktop"]', '[data-tour="nav-calendar-mobile"]'],
     route: '/calendar',
     placement: 'right',
   },
 ];
 
-const TARGET_TIMEOUT_MS = 2500;
+const TARGET_TIMEOUT_MS = 1200;
 const WATCHDOG_DELAY_MS = 100;
 const VIEWPORT_PADDING = 12;
 const TOOLTIP_OFFSET = 12;
+const PLACEMENT_TIMEOUT_MS = 900;
+const MAX_MISSING_STEPS = 3;
 
 export const TourManager = () => {
   const { state, status, closeTour, nextStep, resetToken, setLastStepIndex, setTourStatus } = useOnboarding();
-  const { pushToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [targetEl, setTargetEl] = useState<Element | null>(null);
@@ -76,6 +76,7 @@ export const TourManager = () => {
   const resolveIdRef = useRef(0);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const rafIdRef = useRef<number | null>(null);
+  const missingCountRef = useRef(0);
 
   const stepIndex = state.lastStepIndex;
   const maxStepIndex = steps.length - 1;
@@ -95,12 +96,25 @@ export const TourManager = () => {
     [closeTour],
   );
 
+  const handleMissingStep = useCallback(
+    async (reason: string) => {
+      missingCountRef.current += 1;
+      if (missingCountRef.current >= MAX_MISSING_STEPS || isLastStep) {
+        await hardExitTour(reason, { skipped: true, introSeen: true, lastStepIndex: 0 });
+        return;
+      }
+      await nextStep(maxStepIndex);
+    },
+    [hardExitTour, isLastStep, maxStepIndex, nextStep],
+  );
+
   useEffect(() => {
     if (status === 'idle') {
       setTargetEl(null);
       setResolvedStepId(null);
       setTargetRect(null);
       setTooltipPlacement(null);
+      missingCountRef.current = 0;
     }
   }, [status]);
 
@@ -136,11 +150,11 @@ export const TourManager = () => {
       if (cancelled || resolveIdRef.current !== runId) return;
 
       if (!found) {
-        pushToast({ tone: 'error', message: "Tour couldn't find the next step. Try again." });
-        await hardExitTour('missing_target');
+        await handleMissingStep('missing_target');
         return;
       }
 
+      missingCountRef.current = 0;
       setTargetEl(found);
       setResolvedStepId(current.id);
       setTourStatus('active');
@@ -151,7 +165,7 @@ export const TourManager = () => {
     return () => {
       cancelled = true;
     };
-  }, [current, hardExitTour, navigate, pushToast, setTourStatus, status]);
+  }, [current, hardExitTour, navigate, setTourStatus, status]);
 
   useEffect(() => {
     if (status !== 'active' || !current?.route) return;
@@ -167,7 +181,7 @@ export const TourManager = () => {
   useEffect(() => {
     if (status !== 'active' || !targetEl) return;
     const interval = window.setInterval(() => {
-      if (!targetEl.isConnected) {
+      if (!targetEl.isConnected || !isTourTargetVisible(targetEl)) {
         setTargetEl(null);
         setResolvedStepId(null);
         setTargetRect(null);
@@ -179,12 +193,17 @@ export const TourManager = () => {
   }, [setTourStatus, status, targetEl]);
 
   const updatePositions = useCallback(() => {
-    if (!targetEl) {
+    if (!targetEl || !isTourTargetVisible(targetEl)) {
       setTargetRect(null);
       setTooltipPlacement(null);
       return;
     }
     const nextTargetRect = targetEl.getBoundingClientRect();
+    if (nextTargetRect.width <= 0 || nextTargetRect.height <= 0) {
+      setTargetRect(null);
+      setTooltipPlacement(null);
+      return;
+    }
     setTargetRect(nextTargetRect);
     const tooltipEl = tooltipRef.current;
     if (!tooltipEl) {
@@ -244,11 +263,11 @@ export const TourManager = () => {
     if (isTargetResolved) return;
     const timer = window.setTimeout(() => {
       if (!isTargetResolved) {
-        void hardExitTour('failsafe-missing-tooltip');
+        void handleMissingStep('failsafe-missing-tooltip');
       }
     }, WATCHDOG_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [hardExitTour, isTargetResolved, status]);
+  }, [handleMissingStep, isTargetResolved, status]);
 
   useEffect(() => {
     if (status === 'idle' || status === 'paused') return;
@@ -257,6 +276,17 @@ export const TourManager = () => {
       void hardExitTour('invalid-step', { lastStepIndex: 0 });
     }
   }, [hardExitTour, maxStepIndex, setLastStepIndex, status, stepIndex]);
+
+  useEffect(() => {
+    if (status !== 'active' || !isTargetResolved) return;
+    if (tooltipPlacement) return;
+    const timer = window.setTimeout(() => {
+      if (!tooltipPlacement) {
+        void handleMissingStep('placement-timeout');
+      }
+    }, PLACEMENT_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [handleMissingStep, isTargetResolved, status, tooltipPlacement]);
 
   const tooltipStyle = useMemo(() => {
     if (!tooltipPlacement) {
@@ -334,11 +364,11 @@ const resolveTarget = async (
     const routeReady = await waitForCondition(() => currentPath() === step.route, deadline, isCancelled);
     if (!routeReady) return null;
   }
-  return waitForSelector(step.selector, deadline, isCancelled);
+  return waitForSelector(getStepSelectors(step), deadline, isCancelled);
 };
 
-const waitForSelector = async (selector: string, deadline: number, isCancelled: () => boolean) => {
-  return waitForCondition(() => document.querySelector(selector), deadline, isCancelled);
+const waitForSelector = async (selectors: string[], deadline: number, isCancelled: () => boolean) => {
+  return waitForCondition(() => pickVisibleTourTarget(selectors), deadline, isCancelled);
 };
 
 const waitForCondition = async <T,>(
@@ -361,3 +391,29 @@ const waitForFrame = () =>
       window.setTimeout(() => resolve(), 0);
     });
   });
+
+const getStepSelectors = (step: TourStep) => (Array.isArray(step.selector) ? step.selector : [step.selector]);
+
+export const pickVisibleTourTarget = (selectors: string[], root: ParentNode = document) => {
+  for (const selector of selectors) {
+    const nodes = Array.from(root.querySelectorAll(selector));
+    for (const node of nodes) {
+      if (isTourTargetVisible(node)) {
+        return node;
+      }
+    }
+  }
+  return null;
+};
+
+export const isTourTargetVisible = (el: Element | null): el is HTMLElement => {
+  if (!el || !(el instanceof HTMLElement)) return false;
+  if (typeof window === 'undefined') return false;
+  const style = window.getComputedStyle(el);
+  if (!style) return false;
+  const opacity = Number.parseFloat(style.opacity || '1');
+  if (style.display === 'none' || style.visibility === 'hidden' || opacity === 0) return false;
+  if (el.getClientRects().length === 0) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+};

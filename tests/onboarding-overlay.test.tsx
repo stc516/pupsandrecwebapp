@@ -6,7 +6,7 @@ import { vi } from 'vitest';
 
 import { HomePage } from '../src/pages/Home/HomePage';
 import { OnboardingOverlayRoot } from '../src/components/onboarding/OnboardingOverlayRoot';
-import { OnboardingContext, type OnboardingState, type TourStatus } from '../src/context/OnboardingContext';
+import { OnboardingContext, useOnboarding, type OnboardingState, type TourStatus } from '../src/context/OnboardingContext';
 
 vi.mock('../src/hooks/useAppState', () => ({
   useAppState: () => ({
@@ -23,10 +23,18 @@ vi.mock('../src/components/onboarding/OnboardingTour', async () => {
   const { useOnboarding } = await import('../src/context/OnboardingContext');
   return {
     TourManager: () => {
-      const { closeTour } = useOnboarding();
+      const { closeTour, nextStep } = useOnboarding();
       return React.createElement(
         'div',
         { 'data-testid': 'tour-overlay' },
+        React.createElement(
+          'button',
+          {
+            type: 'button',
+            onClick: () => void nextStep(4),
+          },
+          'Next',
+        ),
         React.createElement(
           'button',
           {
@@ -84,7 +92,16 @@ const TestOnboardingProvider = ({
       setStatus('idle');
       setResetToken((prev) => prev + 1);
     },
-    nextStep: async () => {},
+    nextStep: async (maxStep: number) => {
+      setStatus('waitingForTarget');
+      setState((prev) => {
+        const nextIndex = prev.lastStepIndex + 1;
+        if (nextIndex > maxStep) {
+          return { ...prev, completed: true, introSeen: true, skipped: false, lastStepIndex: 0 };
+        }
+        return { ...prev, lastStepIndex: nextIndex };
+      });
+    },
     setLastStepIndex: async (index: number) => {
       setState((prev) => ({ ...prev, lastStepIndex: index }));
     },
@@ -108,6 +125,11 @@ const TestOnboardingProvider = ({
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
 };
 
+const StepIndicator = () => {
+  const { state } = useOnboarding();
+  return <div data-testid="step-index">{state.lastStepIndex}</div>;
+};
+
 describe('Onboarding overlay clickability', () => {
   it('allows resume tour and skip without leaving a blocking overlay', async () => {
     const user = userEvent.setup();
@@ -118,6 +140,7 @@ describe('Onboarding overlay clickability', () => {
       <TestOnboardingProvider onStartTour={onStartTour} onCloseTour={onCloseTour}>
         <MemoryRouter>
           <HomePage />
+          <StepIndicator />
           <OnboardingOverlayRoot />
         </MemoryRouter>
       </TestOnboardingProvider>,
@@ -127,6 +150,10 @@ describe('Onboarding overlay clickability', () => {
     await user.click(resumeButton);
     expect(onStartTour).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('tour-overlay')).toBeInTheDocument();
+
+    const nextButton = screen.getByRole('button', { name: /next/i });
+    await user.click(nextButton);
+    expect(screen.getByTestId('step-index')).toHaveTextContent('1');
 
     const skipButton = screen.getByRole('button', { name: /skip tour/i });
     await user.click(skipButton);
