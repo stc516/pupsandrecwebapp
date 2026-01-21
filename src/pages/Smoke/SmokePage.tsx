@@ -31,11 +31,12 @@ export const SmokePage = () => {
 
   const fetchCounts = async () => {
     if (!user || !supabase) return;
+    const client = supabase;
     setLoadingCounts(true);
     try {
       const tableCounts = await Promise.all(
         ['pets', 'reminders', 'activities', 'journal_entries'].map((table) =>
-          supabase.from(table).select('id', { head: true, count: 'exact' }).eq('user_id', user.id),
+          client.from(table).select('id', { head: true, count: 'exact' }).eq('user_id', user.id),
         ),
       );
       const [pets, reminders, activities, journal_entries] = tableCounts.map((res) => res.count ?? 0);
@@ -59,9 +60,10 @@ export const SmokePage = () => {
 
   const seedDemoData = async () => {
     if (!user || !supabase) return;
+    const client = supabase;
     setSeeding(true);
     try {
-      const { data: petRows, error: petError } = await supabase
+      const { data: petRows, error: petError } = await client
         .from('pets')
         .insert([
           {
@@ -117,9 +119,9 @@ export const SmokePage = () => {
       }));
 
       const [remErr, actErr, jrErr] = await Promise.all([
-        supabase.from('reminders').insert(reminders),
-        supabase.from('activities').insert(activities),
-        supabase.from('journal_entries').insert(journals),
+        client.from('reminders').insert(reminders),
+        client.from('activities').insert(activities),
+        client.from('journal_entries').insert(journals),
       ]).then((results) => results.map((r) => r.error));
 
       if (remErr || actErr || jrErr) {
@@ -141,11 +143,12 @@ export const SmokePage = () => {
 
   const clearData = async () => {
     if (!user || !supabase) return;
+    const client = supabase;
     setClearing(true);
     try {
       const tables = ['reminders', 'activities', 'journal_entries', 'pets'];
       for (const table of tables) {
-        const { error } = await supabase.from(table).delete().eq('user_id', user.id);
+        const { error } = await client.from(table).delete().eq('user_id', user.id);
         if (error) throw error;
       }
       pushToast({ tone: 'success', message: 'Cleared your data.' });
