@@ -10,7 +10,7 @@ import {
 } from 'react';
 
 import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabaseClient';
+import { getSupabaseClient, supabaseConfigured } from '../lib/supabaseClient';
 
 export type TourStatus = 'idle' | 'waitingForTarget' | 'active' | 'paused';
 
@@ -83,15 +83,23 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const persistProgress = useCallback((next: OnboardingState) => {
-    if (!user) return;
-    void supabase.auth
-      .updateUser({ data: { onboarding: pickProgress(next) } })
-      .catch((error: unknown) => {
-        if (import.meta.env.DEV) {
-          // eslint-disable-next-line no-console
-          console.warn('Onboarding metadata update failed', error);
-        }
-      });
+    if (!user || !supabaseConfigured) return;
+    try {
+      const client = getSupabaseClient();
+      void client.auth
+        .updateUser({ data: { onboarding: pickProgress(next) } })
+        .catch((error: unknown) => {
+          if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.warn('Onboarding metadata update failed', error);
+          }
+        });
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn('Onboarding metadata update skipped', error);
+      }
+    }
   }, [user]);
 
   const updateProgress = useCallback(async (updater: (prev: OnboardingState) => OnboardingState) => {
