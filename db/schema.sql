@@ -68,6 +68,28 @@ create policy "Users can manage own activities" on public.activities
 
 create policy "Users can manage own journal entries" on public.journal_entries
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Storage: pet-avatars bucket and policies
+insert into storage.buckets (id, name, public)
+values ('pet-avatars', 'pet-avatars', true)
+on conflict (id) do nothing;
+
+create policy "Users can upload pet avatars" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'pet-avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can view pet avatars" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'pet-avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can update pet avatars" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'pet-avatars' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'pet-avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can delete pet avatars" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'pet-avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 -- Supabase SQL for Pups & Rec
 -- Tables: pets, reminders, activities, journal_entries
 

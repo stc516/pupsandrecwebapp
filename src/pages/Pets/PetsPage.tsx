@@ -10,6 +10,9 @@ import { PageLayout } from '../../layouts/PageLayout';
 import { useAppState } from '../../hooks/useAppState';
 import { formatDate } from '../../utils/dates';
 import { useToast } from '../../components/ui/ToastProvider';
+import { PetAvatar } from '../../components/ui/PetAvatar';
+import { useAuth } from '../../hooks/useAuth';
+import { supabase } from '../../lib/supabaseClient';
 
 const healthOptions = ['vet-visit', 'vaccine', 'medication', 'injury', 'weight', 'other'] as const;
 
@@ -32,14 +35,17 @@ export const PetsPage = () => {
     deleteHealthRecord,
   } = useAppState();
   const { pushToast } = useToast();
+  const { user } = useAuth();
 
   const [activePetId, setActivePetId] = useState(selectedPetId ?? pets[0]?.id);
   const activePet = useMemo(() => pets.find((pet) => pet.id === activePetId), [pets, activePetId]);
 
   const [petForm, setPetForm] = useState({ name: '', breed: '', avatarUrl: '', notes: '' });
+  const [petImageFile, setPetImageFile] = useState<File | null>(null);
   const [petErrors, setPetErrors] = useState<Record<string, string>>({});
   const [editingPetId, setEditingPetId] = useState<string | null>(null);
   const [editPetState, setEditPetState] = useState({ name: '', breed: '', avatarUrl: '', notes: '' });
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
 
   const [healthForm, setHealthForm] = useState({
     date: new Date().toISOString().slice(0, 10),
@@ -70,7 +76,20 @@ export const PetsPage = () => {
     return next;
   };
 
-  const handleAddPet = (event: FormEvent<HTMLFormElement>) => {
+  const uploadAvatar = async (file: File, petId: string) => {
+    if (!user) throw new Error('Sign in to upload a photo.');
+    const fileExt = file.name.split('.').pop() ?? 'jpg';
+    const filePath = `${user.id}/${petId}.${fileExt}`;
+    const { error } = await supabase.storage.from('pet-avatars').upload(filePath, file, {
+      upsert: true,
+      cacheControl: '3600',
+    });
+    if (error) throw error;
+    const { data } = supabase.storage.from('pet-avatars').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const handleAddPet = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const validation = validatePetState(petForm);
     if (Object.keys(validation).length) {
@@ -78,18 +97,29 @@ export const PetsPage = () => {
       pushToast({ tone: 'error', message: 'Fix the highlighted pet fields.' });
       return;
     }
-    addPet({
-      name: petForm.name,
-      breed: petForm.breed,
-      avatarUrl:
-        petForm.avatarUrl ||
-        'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
-      notes: petForm.notes,
-      healthRecords: [],
-    });
-    setPetForm({ name: '', breed: '', avatarUrl: '', notes: '' });
-    setPetErrors({});
-    pushToast({ tone: 'success', message: 'Pet added.' });
+    try {
+      const created = await addPet({
+        name: petForm.name.trim(),
+        breed: petForm.breed.trim(),
+        avatarUrl: '',
+        notes: petForm.notes,
+        healthRecords: [],
+      });
+
+      if (petImageFile) {
+        const url = await uploadAvatar(petImageFile, created.id);
+        await updatePet({ ...created, avatarUrl: url });
+      }
+      setPetForm({ name: '', breed: '', avatarUrl: '', notes: '' });
+      setPetImageFile(null);
+      setPetErrors({});
+      pushToast({ tone: 'success', message: 'Pet added.' });
+    } catch (error) {
+      pushToast({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Could not add pet.',
+      });
+    }
   };
 
   const startEditingPet = (petId: string) => {
@@ -105,7 +135,7 @@ export const PetsPage = () => {
     setPetErrors({});
   };
 
-  const handleEditPet = (event: FormEvent<HTMLFormElement>) => {
+  const handleEditPet = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editingPetId) return;
     const validation = validatePetState(editPetState);
@@ -116,15 +146,27 @@ export const PetsPage = () => {
     }
     const original = pets.find((p) => p.id === editingPetId);
     if (!original) return;
-    updatePet({
-      ...original,
-      name: editPetState.name,
-      breed: editPetState.breed,
-      avatarUrl: editPetState.avatarUrl,
-      notes: editPetState.notes,
-    });
-    setEditingPetId(null);
-    pushToast({ tone: 'success', message: 'Pet updated.' });
+    try {
+      let avatarUrl = editPetState.avatarUrl;
+      if (editImageFile) {
+        avatarUrl = await uploadAvatar(editImageFile, original.id);
+      }
+      await updatePet({
+        ...original,
+        name: editPetState.name.trim(),
+        breed: editPetState.breed.trim(),
+        avatarUrl,
+        notes: editPetState.notes,
+      });
+      setEditingPetId(null);
+      setEditImageFile(null);
+      pushToast({ tone: 'success', message: 'Pet updated.' });
+    } catch (error) {
+      pushToast({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Could not update pet.',
+      });
+    }
   };
 
   const handleDeletePet = (petId: string) => {
@@ -240,11 +282,12 @@ export const PetsPage = () => {
                 {petErrors.breed && <p className="mt-1 text-xs text-red-500">{petErrors.breed}</p>}
               </label>
               <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                Photo URL
+                Upload photo
                 <input
+                  type="file"
+                  accept="image/*"
                   className={textFieldClasses()}
-                  value={petForm.avatarUrl}
-                  onChange={(event) => setPetForm((prev) => ({ ...prev, avatarUrl: event.target.value }))}
+                  onChange={(event) => setPetImageFile(event.target.files?.[0] ?? null)}
                 />
               </label>
               <label className="flex flex-col text-sm font-medium text-brand-primary/90">
@@ -273,7 +316,7 @@ export const PetsPage = () => {
               )}
             >
               <button className="flex flex-1 items-center gap-3 text-left" onClick={() => setActivePetId(pet.id)}>
-                <img src={pet.avatarUrl} alt={pet.name} className="h-12 w-12 rounded-2xl object-cover" />
+                <PetAvatar name={pet.name} avatarUrl={pet.avatarUrl} petId={pet.id} size="md" className="rounded-2xl" />
                 <div>
                   <p className="text-sm font-semibold text-brand-primary">{pet.name}</p>
                   <p className="text-xs text-text-muted">{pet.breed}</p>
@@ -303,7 +346,7 @@ export const PetsPage = () => {
           <div className="lg:col-span-2 space-y-4">
             <Card padding="lg" className="space-y-4">
               <div className="flex flex-col gap-4 md:flex-row">
-                <img src={activePet.avatarUrl} alt={activePet.name} className="h-40 w-40 rounded-3xl object-cover" />
+                <PetAvatar name={activePet.name} avatarUrl={activePet.avatarUrl} petId={activePet.id} size="xl" className="rounded-3xl" />
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center justify-between">
                     <h3 className="text-2xl font-semibold text-brand-primary">{activePet.name}</h3>
@@ -357,11 +400,12 @@ export const PetsPage = () => {
                     {petErrors.breed && <p className="mt-1 text-xs text-red-500">{petErrors.breed}</p>}
                   </label>
                   <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                    Photo URL
+                    Upload photo
                     <input
+                      type="file"
+                      accept="image/*"
                       className={textFieldClasses()}
-                      value={editPetState.avatarUrl}
-                      onChange={(event) => setEditPetState((prev) => ({ ...prev, avatarUrl: event.target.value }))}
+                      onChange={(event) => setEditImageFile(event.target.files?.[0] ?? null)}
                     />
                   </label>
                   <label className="flex flex-col text-sm font-medium text-brand-primary/90">

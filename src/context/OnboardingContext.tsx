@@ -10,7 +10,7 @@ import {
 } from 'react';
 
 import { useAuth } from '../hooks/useAuth';
-import { supabase, supabaseConfigured } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 
 export type TourStatus = 'idle' | 'waitingForTarget' | 'active' | 'paused';
 
@@ -49,10 +49,10 @@ interface OnboardingContextValue {
   state: OnboardingState;
   status: TourStatus;
   isOpen: boolean;
-  resetToken: number;
   dismissIntro: () => Promise<void>;
   startTour: (reset?: boolean) => Promise<void>;
-  closeTour: (reason: string, updates?: Partial<OnboardingProgress>) => Promise<void>;
+  restartTour: () => Promise<void>;
+  closeTour: (reason: string, updates?: Partial<OnboardingProgress>, nextStatus?: TourStatus) => Promise<void>;
   nextStep: (maxStep: number) => Promise<void>;
   setLastStepIndex: (index: number) => Promise<void>;
   setTourStatus: (status: TourStatus) => void;
@@ -60,13 +60,12 @@ interface OnboardingContextValue {
   resetOnboarding: () => Promise<void>;
 }
 
-export const OnboardingContext = createContext<OnboardingContextValue | undefined>(undefined);
+const OnboardingContext = createContext<OnboardingContextValue | undefined>(undefined);
 
 export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [state, setState] = useState<OnboardingState>(defaultState);
   const [status, setStatus] = useState<TourStatus>('idle');
-  const [resetToken, setResetToken] = useState(0);
   const lastUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -84,7 +83,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const persistProgress = useCallback((next: OnboardingState) => {
-    if (!user || !supabaseConfigured || !supabase) return;
+    if (!user) return;
     void supabase.auth
       .updateUser({ data: { onboarding: pickProgress(next) } })
       .catch((error: unknown) => {
@@ -121,9 +120,19 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, [updateProgress]);
 
-  const closeTour = useCallback(async (reason: string, updates: Partial<OnboardingProgress> = {}) => {
+  const restartTour = useCallback(async () => {
     setStatus('idle');
-    setResetToken((prev) => prev + 1);
+    await updateProgress((prev) => ({
+      ...prev,
+      completed: false,
+      introSeen: false,
+      skipped: false,
+      lastStepIndex: 0,
+    }));
+  }, [updateProgress]);
+
+  const closeTour = useCallback(async (reason: string, updates: Partial<OnboardingProgress> = {}, nextStatus: TourStatus = 'idle') => {
+    setStatus(nextStatus);
     await updateProgress((prev) => ({
       ...prev,
       ...updates,
@@ -136,7 +145,6 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   }, [updateProgress]);
 
   const nextStep = useCallback(async (maxStep: number) => {
-    setStatus('waitingForTarget');
     await updateProgress((prev) => {
       const nextIndex = prev.lastStepIndex + 1;
       if (nextIndex > maxStep) {
@@ -153,6 +161,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
         lastStepIndex: nextIndex,
       };
     });
+    setStatus('waitingForTarget');
   }, [updateProgress]);
 
   const setLastStepIndex = useCallback(async (index: number) => {
@@ -178,7 +187,6 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
 
   const resetOnboarding = useCallback(async () => {
     setStatus('idle');
-    setResetToken((prev) => prev + 1);
     await updateProgress(() => ({
       ...defaultState,
       checklist: {
@@ -191,16 +199,16 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     state,
     status,
     isOpen: status === 'waitingForTarget' || status === 'active',
-    resetToken,
     dismissIntro,
     startTour,
+    restartTour,
     closeTour,
     nextStep,
     setLastStepIndex,
     setTourStatus,
     setChecklist,
     resetOnboarding,
-  }), [closeTour, dismissIntro, nextStep, resetOnboarding, resetToken, setChecklist, setLastStepIndex, setTourStatus, startTour, state, status]);
+  }), [closeTour, dismissIntro, nextStep, resetOnboarding, restartTour, setChecklist, setLastStepIndex, setTourStatus, startTour, state, status]);
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
 };

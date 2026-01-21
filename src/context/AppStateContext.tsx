@@ -594,8 +594,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const addPet = useCallback(
     async (payload: Omit<Pet, 'id'>) => {
       if (!user?.id) {
-    dispatch({ type: 'add-pet', payload: { ...payload, id: nanoid() } });
-        const added = { ...payload, id: nanoid() };
+        const id = nanoid();
+        const added = { ...payload, id };
+        dispatch({ type: 'add-pet', payload: added });
         return added as Pet;
       }
       const created = await createPet(user.id, payload);

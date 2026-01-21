@@ -3,16 +3,15 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
 import { useAuth } from '../../hooks/useAuth';
-import { supabaseConfigError } from '../../lib/supabaseClient';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'password' | 'magic'>('password');
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
-  const { user, loginWithMagicLink, loginWithGoogle, isLoading, isAuthReady } = useAuth();
+  const { user, sendMagicLink, loginWithGoogle, signInWithPassword, isLoading, isAuthReady } = useAuth();
   const navigate = useNavigate();
-  const configError = supabaseConfigError;
-  const canAuthenticate = !configError;
 
   useEffect(() => {
     if (isAuthReady && user) {
@@ -27,9 +26,15 @@ export const LoginPage = () => {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    setSent(false);
     try {
-      await loginWithMagicLink(email);
-      setSent(true);
+      if (mode === 'password') {
+        await signInWithPassword(email, password);
+        navigate('/');
+      } else {
+        await sendMagicLink(email);
+        setSent(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     }
@@ -45,11 +50,23 @@ export const LoginPage = () => {
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
-          {configError ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              {configError}
-            </div>
-          ) : null}
+          <div className="flex gap-2 text-xs font-semibold text-brand-primary/80">
+            <button
+              type="button"
+              onClick={() => setMode('password')}
+              className={`rounded-full px-3 py-1 ${mode === 'password' ? 'bg-brand-primary text-white' : 'bg-brand-subtle'}`}
+            >
+              Email + Password
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('magic')}
+              className={`rounded-full px-3 py-1 ${mode === 'magic' ? 'bg-brand-primary text-white' : 'bg-brand-subtle'}`}
+            >
+              Magic Link
+            </button>
+          </div>
+
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Email</span>
             <input
@@ -57,30 +74,63 @@ export const LoginPage = () => {
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              disabled={!canAuthenticate}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 outline-none ring-brand-primary/20 focus:border-brand-primary focus:ring-4 disabled:cursor-not-allowed disabled:bg-slate-50"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 outline-none ring-brand-primary/20 focus:border-brand-primary focus:ring-4"
             />
+            <p className="mt-1 text-xs text-text-muted">Use the same email you signed up with.</p>
           </label>
 
+          {mode === 'password' && (
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Password</span>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 outline-none ring-brand-primary/20 focus:border-brand-primary focus:ring-4"
+              />
+              <p className="mt-1 text-xs text-text-muted">At least 6 characters.</p>
+            </label>
+          )}
+
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          {sent ? <p className="text-sm text-emerald-600">Check your email for a magic link.</p> : null}
+          {sent ? <p className="text-sm text-emerald-600">Check your email to continue.</p> : null}
 
           <button
             type="submit"
-            disabled={isLoading || !canAuthenticate}
+            disabled={isLoading}
             className="w-full rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:bg-brand-primary/60"
           >
-            {isLoading ? 'Sending link…' : 'Send magic link'}
+            {isLoading
+              ? mode === 'password'
+                ? 'Signing in…'
+                : 'Sending magic link…'
+              : mode === 'password'
+                ? 'Sign in'
+                : 'Send magic link'}
           </button>
+          {mode === 'magic' && <p className="text-xs text-text-muted">We’ll email you a one-time sign-in link.</p>}
 
           <button
             type="button"
-            onClick={() => loginWithGoogle()}
-            disabled={isLoading || !canAuthenticate}
+            onClick={async () => {
+              setError(null);
+              try {
+                await loginWithGoogle();
+              } catch (err) {
+                setError(
+                  err instanceof Error
+                    ? err.message
+                    : 'Google sign-in failed. Ensure the provider is enabled in Supabase.',
+                );
+              }
+            }}
+            disabled={isLoading}
             className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-brand-primary transition hover:bg-brand-subtle disabled:cursor-not-allowed disabled:opacity-70"
           >
             Continue with Google
           </button>
+          <p className="text-xs text-text-muted text-center">Google sign-in requires provider enabled in Supabase.</p>
         </form>
 
         <p className="mt-6 text-center text-sm text-slate-500">

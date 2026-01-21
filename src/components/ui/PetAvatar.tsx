@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { PawPrint } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -36,13 +37,19 @@ const sizeClasses = {
 export const PetAvatar = ({ name, avatarUrl, petId, size = 'md', className }: PetAvatarProps) => {
   const initials = getInitials(name ?? undefined);
   const colorClass = palette[hashString((petId ?? name ?? 'pet') as string) % palette.length];
+  const [imageFailed, setImageFailed] = useState(false);
 
-  if (avatarUrl) {
+  useEffect(() => {
+    setImageFailed(false);
+  }, [avatarUrl]);
+
+  if (avatarUrl && !imageFailed) {
     return (
       <img
         src={avatarUrl}
         alt={name ?? 'Pet avatar'}
         className={clsx('rounded-full object-cover', sizeClasses[size], className)}
+        onError={() => setImageFailed(true)}
       />
     );
   }

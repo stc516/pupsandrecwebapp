@@ -212,6 +212,12 @@ export const JournalPage = () => {
     );
   }, [journalEntries, filters]);
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.info(`[JournalPage] selectedPetId=${selectedPetId} fetchedCount=${filteredEntries.length}`);
+  }, [filteredEntries.length, selectedPetId]);
+
   const entriesForInsights = useMemo(
     () =>
       filters.pet === 'all'
@@ -257,27 +263,37 @@ export const JournalPage = () => {
     return nextErrors;
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedPetId) return;
+    if (!selectedPetId) {
+      pushToast({ tone: 'error', message: 'Select a pet first.' });
+      return;
+    }
     const nextErrors = validateForm(formState);
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       pushToast({ tone: 'error', message: 'Fix the highlighted fields before saving.' });
       return;
     }
-    addJournalEntry({
-      petId: selectedPetId,
-      date: new Date(formState.date).toISOString(),
-      title: formState.title,
-      content: formState.content,
-      tags: formState.tags,
-      category: formState.category,
-      photoUrl: formState.photoUrl,
-    });
-    setFormState(() => createInitialFormState());
-    setErrors({});
-    pushToast({ tone: 'success', message: 'Journal entry saved.' });
+    try {
+      await addJournalEntry({
+        petId: selectedPetId,
+        date: new Date(formState.date).toISOString(),
+        title: formState.title,
+        content: formState.content,
+        tags: formState.tags,
+        category: formState.category,
+        photoUrl: formState.photoUrl,
+      });
+      setFormState(() => createInitialFormState());
+      setErrors({});
+      pushToast({ tone: 'success', message: 'Journal entry saved.' });
+    } catch (error) {
+      pushToast({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Select a pet first.',
+      });
+    }
   };
 
   const startEditingEntry = (entryId: string) => {
@@ -399,13 +415,43 @@ export const JournalPage = () => {
                   onDelete={() => handleDeleteEntry(entry.id)}
                 />
               ))}
-              {filteredEntries.length === 0 && (
+              {journalEntries.filter((entry) => entry.petId === selectedPetId).length === 0 && (
                 <Card padding="lg" className="border-dashed text-center text-text-secondary">
-                  <p className="text-sm">
-                    No entries match these filters yet. Try choosing another pet, category, or tag.
-                  </p>
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-brand-primary">
+                      No journal entries yet for {heroPetName}
+                    </p>
+                    <p className="text-sm text-text-secondary">
+                      Capture your first memory to kick things off.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const composer = document.getElementById('journal-composer');
+                        if (composer) {
+                          composer.scrollIntoView({ behavior: 'smooth' });
+                          const input = composer.querySelector('input, textarea, select') as HTMLElement | null;
+                          if (input) input.focus();
+                        }
+                      }}
+                      className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-primary/90"
+                    >
+                      Write first entry
+                    </button>
+                  </div>
                 </Card>
               )}
+              {journalEntries.filter((entry) => entry.petId === selectedPetId).length > 0 &&
+                filteredEntries.length === 0 && (
+                  <Card padding="lg" className="border-dashed text-center text-text-secondary">
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-brand-primary">No entries match these filters</p>
+                      <p className="text-sm text-text-secondary">
+                        Try choosing another pet, category, or tag.
+                      </p>
+                    </div>
+                  </Card>
+                )}
             </div>
           </div>
 

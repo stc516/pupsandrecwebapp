@@ -18,7 +18,7 @@ const quickActions = [
 
 export const HomePage = () => {
   const { selectedPet, activities, journalEntries, reminders, xp } = useAppState();
-  const { state: onboarding, startTour, closeTour, setChecklist, resetOnboarding } = useOnboarding();
+  const { state: onboarding, startTour, restartTour, closeTour, setChecklist, resetOnboarding } = useOnboarding();
   const petName = selectedPet?.name ?? 'your pup';
   const petAvatar = selectedPet?.avatarUrl ?? '';
   const petActivities = activities.filter((activity) => activity.petId === selectedPet?.id);
@@ -162,17 +162,24 @@ export const HomePage = () => {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => void startTour()}
+                onClick={() => void startTour(true)}
                 className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-primary/90"
               >
                 Resume tour
               </button>
               <button
                 type="button"
+                onClick={() => void restartTour()}
+                className="inline-flex items-center justify-center rounded-full border border-brand-border px-4 py-2 text-sm font-semibold text-brand-primary hover:border-brand-primary"
+              >
+                Restart tutorial
+              </button>
+              <button
+                type="button"
                 onClick={() => void closeTour('skip', { skipped: true, introSeen: true, lastStepIndex: 0 })}
                 className="inline-flex items-center justify-center rounded-full border border-brand-border px-4 py-2 text-sm font-semibold text-brand-primary hover:border-brand-primary"
               >
-                Skip
+                Stop tour
               </button>
               {showReset && (
                 <button

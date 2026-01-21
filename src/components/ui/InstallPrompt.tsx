@@ -29,24 +29,25 @@ export const InstallPrompt = () => {
   };
 
   return (
-    <div className="fixed bottom-[calc(5.5rem+var(--safe-area-bottom))] left-0 right-0 z-40 flex justify-center px-4">
-      <div className="flex w-full max-w-md items-center gap-3 rounded-3xl border border-brand-border bg-white/95 p-4 shadow-card backdrop-blur">
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-brand-primary">Install Pups & Rec</p>
-          <p className="text-xs text-text-secondary">Keep logging walks even when you’re offline.</p>
+    <div className="fixed right-4 top-[calc(4.75rem+var(--safe-area-top))] z-40 w-[min(90vw,22rem)]">
+      <div className="flex items-start gap-3 rounded-3xl border border-brand-border bg-white/95 p-4 shadow-lg backdrop-blur">
+        <div className="flex-1 space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Install app</p>
+          <p className="text-base font-semibold text-brand-primary">Get Pups &amp; Rec on your home screen</p>
+          <p className="text-xs text-text-secondary">Works offline for quick logging.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col items-end gap-2">
           <button
             type="button"
             onClick={() => setVisible(false)}
-            className="rounded-full border border-brand-border px-3 py-1 text-xs font-semibold text-text-secondary"
+            className="rounded-full border border-brand-border px-3 py-1 text-[11px] font-semibold text-text-secondary"
           >
-            Later
+            Not now
           </button>
           <button
             type="button"
             onClick={handleInstall}
-            className="rounded-full bg-brand-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm"
+            className="rounded-full bg-brand-accent px-4 py-2 text-xs font-semibold text-white shadow-sm"
           >
             Install
           </button>
