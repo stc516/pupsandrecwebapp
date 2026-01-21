@@ -49,9 +49,10 @@ interface OnboardingContextValue {
   state: OnboardingState;
   status: TourStatus;
   isOpen: boolean;
+  resetToken: number;
   dismissIntro: () => Promise<void>;
   startTour: (reset?: boolean) => Promise<void>;
-  closeTour: (reason: string, updates?: Partial<OnboardingProgress>, nextStatus?: TourStatus) => Promise<void>;
+  closeTour: (reason: string, updates?: Partial<OnboardingProgress>) => Promise<void>;
   nextStep: (maxStep: number) => Promise<void>;
   setLastStepIndex: (index: number) => Promise<void>;
   setTourStatus: (status: TourStatus) => void;
@@ -59,12 +60,13 @@ interface OnboardingContextValue {
   resetOnboarding: () => Promise<void>;
 }
 
-const OnboardingContext = createContext<OnboardingContextValue | undefined>(undefined);
+export const OnboardingContext = createContext<OnboardingContextValue | undefined>(undefined);
 
 export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [state, setState] = useState<OnboardingState>(defaultState);
   const [status, setStatus] = useState<TourStatus>('idle');
+  const [resetToken, setResetToken] = useState(0);
   const lastUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -119,8 +121,9 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, [updateProgress]);
 
-  const closeTour = useCallback(async (reason: string, updates: Partial<OnboardingProgress> = {}, nextStatus: TourStatus = 'idle') => {
-    setStatus(nextStatus);
+  const closeTour = useCallback(async (reason: string, updates: Partial<OnboardingProgress> = {}) => {
+    setStatus('idle');
+    setResetToken((prev) => prev + 1);
     await updateProgress((prev) => ({
       ...prev,
       ...updates,
@@ -175,6 +178,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
 
   const resetOnboarding = useCallback(async () => {
     setStatus('idle');
+    setResetToken((prev) => prev + 1);
     await updateProgress(() => ({
       ...defaultState,
       checklist: {
@@ -187,6 +191,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     state,
     status,
     isOpen: status === 'waitingForTarget' || status === 'active',
+    resetToken,
     dismissIntro,
     startTour,
     closeTour,
@@ -195,7 +200,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     setTourStatus,
     setChecklist,
     resetOnboarding,
-  }), [closeTour, dismissIntro, nextStep, resetOnboarding, setChecklist, setLastStepIndex, setTourStatus, startTour, state, status]);
+  }), [closeTour, dismissIntro, nextStep, resetOnboarding, resetToken, setChecklist, setLastStepIndex, setTourStatus, startTour, state, status]);
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
 };

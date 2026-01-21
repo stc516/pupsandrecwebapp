@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { Card } from '../ui/Card';
@@ -66,7 +65,7 @@ const VIEWPORT_PADDING = 12;
 const TOOLTIP_OFFSET = 12;
 
 export const TourManager = () => {
-  const { state, status, closeTour, nextStep, setLastStepIndex, setTourStatus } = useOnboarding();
+  const { state, status, closeTour, nextStep, resetToken, setLastStepIndex, setTourStatus } = useOnboarding();
   const { pushToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -91,7 +90,7 @@ export const TourManager = () => {
       setResolvedStepId(null);
       setTargetRect(null);
       setTooltipPlacement(null);
-      await closeTour(reason, updates, 'idle');
+      await closeTour(reason, updates);
     },
     [closeTour],
   );
@@ -104,6 +103,17 @@ export const TourManager = () => {
       setTooltipPlacement(null);
     }
   }, [status]);
+
+  useEffect(() => {
+    setTargetEl(null);
+    setResolvedStepId(null);
+    setTargetRect(null);
+    setTooltipPlacement(null);
+    if (rafIdRef.current) {
+      window.cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+  }, [resetToken]);
 
   useEffect(() => {
     if (status !== 'waitingForTarget') return;
@@ -257,10 +267,10 @@ export const TourManager = () => {
 
   if (!isTargetResolved || !current) return null;
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 pointer-events-none">
+  return (
+    <div className="fixed inset-0 z-50 pointer-events-none" data-onboarding-overlay="tour">
       {shouldRenderOverlay && (
-        <div className="absolute inset-0 z-40 bg-slate-900/50 pointer-events-auto onboarding-backdrop" />
+        <div className="absolute inset-0 z-40 bg-slate-900/50 pointer-events-auto onboarding-backdrop" data-onboarding-overlay="backdrop" />
       )}
       {targetRect && (
         <div
@@ -300,8 +310,7 @@ export const TourManager = () => {
           </div>
         </Card>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 };
 

@@ -4,6 +4,7 @@ import { BottomNav } from './layouts/BottomNav';
 import { SidebarNav } from './layouts/SidebarNav';
 import { TopBar } from './layouts/TopBar';
 import { InstallPrompt } from './components/ui/InstallPrompt';
+import { OnboardingOverlayRoot } from './components/onboarding/OnboardingOverlayRoot';
 
 export const AppLayout = () => (
   <div className="relative flex min-h-screen flex-col bg-brand-subtle/60 text-slate-900">
@@ -19,6 +20,7 @@ export const AppLayout = () => (
     </div>
     <BottomNav />
     <InstallPrompt />
+    <OnboardingOverlayRoot />
   </div>
 );
 
