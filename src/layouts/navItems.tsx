@@ -9,6 +9,7 @@ import {
   Trophy,
   Activity,
   Newspaper,
+  Dumbbell,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -21,6 +22,7 @@ export const navItems: NavItem[] = [
   { label: 'Home', path: '/', icon: Home },
   { label: 'Activity', path: '/activity', icon: Activity },
   { label: 'Journal', path: '/journal', icon: NotebookPen },
+  { label: 'Training', path: '/training', icon: Dumbbell },
   { label: 'Calendar', path: '/calendar', icon: CalendarDays },
   { label: 'Feed', path: '/feed', icon: Newspaper },
   { label: 'Pets', path: '/pets', icon: PawPrint },

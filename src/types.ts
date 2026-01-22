@@ -56,6 +56,18 @@ export interface Reminder {
   };
 }
 
+export interface TrainingSession {
+  id: string;
+  petId: PetId;
+  title: string;
+  dateTimeISO: string;
+  durationMin?: number;
+  distanceMi?: number;
+  type: 'obedience' | 'offleash' | 'walk' | 'recall' | 'puppy' | 'custom';
+  notes?: string;
+  createdAt: string;
+}
+
 export type AchievementCondition =
   | 'first-walk'
   | 'journal-count'

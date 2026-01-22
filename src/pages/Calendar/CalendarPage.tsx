@@ -11,6 +11,7 @@ import { PageLayout } from '../../layouts/PageLayout';
 import { useAppState } from '../../hooks/useAppState';
 import { buildMonthMatrix, formatDate, formatTime, sameDay } from '../../utils/dates';
 import { useToast } from '../../components/ui/ToastProvider';
+import { useTraining } from '../../context/TrainingContext';
 import type { Reminder } from '../../types';
 
 const reminderTypes = ['walk', 'vet-appointment', 'medication', 'grooming', 'other'] as const;
@@ -77,6 +78,7 @@ export const CalendarPage = () => {
   } = useAppState();
   const selectedPet = pets.find((pet) => pet.id === selectedPetId) ?? null;
   const { pushToast } = useToast();
+  const { sessions: trainingSessions } = useTraining();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [formState, setFormState] = useState({
@@ -98,6 +100,14 @@ export const CalendarPage = () => {
   const monthMatrix = useMemo(() => buildMonthMatrix(currentMonth), [currentMonth]);
   const dayReminders = reminders.filter(
     (reminder) => reminder.petId === selectedPetId && occursOnDate(reminder, selectedDate),
+  );
+  const dayTraining = useMemo(
+    () =>
+      trainingSessions
+        .filter((session) => session.petId === selectedPetId)
+        .filter((session) => sameDay(session.dateTimeISO, selectedDate))
+        .sort((a, b) => new Date(a.dateTimeISO).getTime() - new Date(b.dateTimeISO).getTime()),
+    [selectedPetId, selectedDate, trainingSessions],
   );
 
   useEffect(() => {
@@ -295,6 +305,23 @@ export const CalendarPage = () => {
           <Card padding="lg">
             <h3 className="text-lg font-semibold text-brand-primary">Reminders on {formatDate(selectedDate)}</h3>
             <div className="mt-3 space-y-3">
+              {dayTraining.length > 0 && (
+                <div className="space-y-2 rounded-2xl border border-brand-border bg-brand-subtle/60 p-3 text-sm text-brand-primary">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Training</p>
+                  {dayTraining.map((session) => (
+                    <div key={session.id} className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-brand-primary">{session.title}</p>
+                        <p className="text-xs text-text-muted">{formatTime(session.dateTimeISO)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-text-secondary">
+                        {session.durationMin ? <TagChip>{session.durationMin} min</TagChip> : null}
+                        {session.distanceMi ? <TagChip>{session.distanceMi} mi</TagChip> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {dayReminders.map((reminder) => {
                 const isEditing = editingReminderId === reminder.id;
                 return (
