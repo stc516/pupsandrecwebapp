@@ -68,6 +68,35 @@ export interface TrainingSession {
   createdAt: string;
 }
 
+export interface TrainingPlan {
+  id: string;
+  title: string;
+  description: string;
+  durationDays: number;
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  milestones: {
+    distance: string;
+    duration: string;
+    distraction: string;
+  };
+  days: PlanDay[];
+}
+
+export interface PlanDay {
+  day: number;
+  focus: string;
+  tasks: PlanTask[];
+}
+
+export interface PlanTask {
+  id: string;
+  title: string;
+  minutes: number;
+  category: 'obedience' | 'leash' | 'socialization' | 'tricks' | 'focus';
+  proofing?: string[];
+  notes?: string;
+}
+
 export type AchievementCondition =
   | 'first-walk'
   | 'journal-count'

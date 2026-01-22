@@ -80,7 +80,7 @@ export const TrainingSection = () => {
   const [customStartDate, setCustomStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [customTime, setCustomTime] = useState(defaultTime);
 
-  const petLabel = selectedPet?.name ? `${selectedPet.name}'s training` : 'Training plan';
+  const petLabel = selectedPet?.name ? `${selectedPet.name}'s sessions` : 'Training sessions';
 
   const upcomingSessions = useMemo(() => {
     if (!selectedPetId) return [];
@@ -132,9 +132,9 @@ export const TrainingSection = () => {
     <Card padding="lg" className="border border-brand-border bg-gradient-to-br from-brand-subtle/80 to-white shadow-lg">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-primary/70">Training plan</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-primary/70">Training sessions</p>
           <h2 className="mt-2 text-2xl font-semibold text-brand-primary">{petLabel}</h2>
-          <p className="mt-1 text-sm text-text-secondary">Quick presets or build your own.</p>
+          <p className="mt-1 text-sm text-text-secondary">One-off sessions you can schedule fast.</p>
         </div>
         <div className="flex gap-2">
           <button

@@ -11,6 +11,7 @@ import { AuthProvider } from './context/AuthContext';
 import { AppStateProvider } from './context/AppStateContext';
 import { OnboardingProvider } from './context/OnboardingContext';
 import { TrainingProvider } from './context/TrainingContext';
+import { TrainingPlanProvider } from './context/TrainingPlanContext';
 import { ActivityPage } from './pages/Activity/ActivityPage';
 import LoginPage from './pages/Auth/LoginPage';
 import SignupPage from './pages/Auth/SignupPage';
@@ -60,11 +61,13 @@ createRoot(document.getElementById('root')!).render(
     <AuthProvider>
       <AppStateProvider>
         <TrainingProvider>
-          <OnboardingProvider>
-            <ToastProvider>
-              <RouterProvider router={router} />
-            </ToastProvider>
-          </OnboardingProvider>
+          <TrainingPlanProvider>
+            <OnboardingProvider>
+              <ToastProvider>
+                <RouterProvider router={router} />
+              </ToastProvider>
+            </OnboardingProvider>
+          </TrainingPlanProvider>
         </TrainingProvider>
       </AppStateProvider>
     </AuthProvider>
