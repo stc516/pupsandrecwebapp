@@ -10,7 +10,6 @@ import { ToastProvider } from './components/ui/ToastProvider';
 import { AuthProvider } from './context/AuthContext';
 import { AppStateProvider } from './context/AppStateContext';
 import { OnboardingProvider } from './context/OnboardingContext';
-import { LaunchHubProvider } from './context/LaunchHubContext';
 import { ActivityPage } from './pages/Activity/ActivityPage';
 import LoginPage from './pages/Auth/LoginPage';
 import SignupPage from './pages/Auth/SignupPage';
@@ -24,7 +23,6 @@ import { JournalPage } from './pages/Journal/JournalPage';
 import { PetsPage } from './pages/Pets/PetsPage';
 import { SettingsPage } from './pages/Settings/SettingsPage';
 import { HealthPage } from './pages/Health/HealthPage';
-import { LaunchHubPage } from './pages/Launch/LaunchHubPage';
 
 registerSW({ immediate: true });
 
@@ -45,7 +43,6 @@ const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'activity', element: <ActivityPage /> },
       { path: 'journal', element: <JournalPage /> },
-      { path: 'launch', element: <LaunchHubPage /> },
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'feed', element: <FeedPage /> },
       { path: 'pets', element: <PetsPage /> },
@@ -59,13 +56,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
       <AppStateProvider>
-        <LaunchHubProvider>
-          <OnboardingProvider>
-            <ToastProvider>
-              <RouterProvider router={router} />
-            </ToastProvider>
-          </OnboardingProvider>
-        </LaunchHubProvider>
+        <OnboardingProvider>
+          <ToastProvider>
+            <RouterProvider router={router} />
+          </ToastProvider>
+        </OnboardingProvider>
       </AppStateProvider>
     </AuthProvider>
   </StrictMode>,

@@ -31,7 +31,7 @@ export const ActivityPage = () => {
   const { pushToast } = useToast();
   const [formState, setFormState] = useState({
     petId: selectedPetId,
-    type: 'walk' as ActivityTypeOption,
+    type: 'training' as ActivityTypeOption,
     date: new Date().toISOString().slice(0, 16),
     durationMinutes: 30,
     distanceKm: 3,

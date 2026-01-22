@@ -1,5 +1,5 @@
 import { addDays, startOfDay } from 'date-fns';
-import { CalendarDays, CheckCircle2, Clock, Compass, Dumbbell, Heart, MapPinned, NotebookPen, PawPrint, Sparkles } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Clock, Compass, Heart, MapPinned, NotebookPen, PawPrint, Sparkles } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -10,10 +10,8 @@ import { useAppState } from '../../hooks/useAppState';
 import { formatDate, formatTime, sameDay } from '../../utils/dates';
 import { PetAvatar } from '../../components/ui/PetAvatar';
 import { useOnboarding } from '../../context/OnboardingContext';
-import { useLaunchHub } from '../../context/LaunchHubContext';
 
 const quickActions = [
-  { label: 'Log Training', icon: <Dumbbell size={16} />, to: '/activity' },
   { label: 'Start Walk', icon: <MapPinned size={16} />, to: '/activity' },
   { label: 'Journal Entry', icon: <NotebookPen size={16} />, to: '/journal' },
   { label: 'View Calendar', icon: <CalendarDays size={16} />, to: '/calendar' },
@@ -22,7 +20,6 @@ const quickActions = [
 export const HomePage = () => {
   const { selectedPet, activities, journalEntries, reminders, xp } = useAppState();
   const { state: onboarding, startTour, closeTour, setChecklist, resetOnboarding } = useOnboarding();
-  const { getNextTask } = useLaunchHub();
   const petName = selectedPet?.name ?? 'your pup';
   const petAvatar = selectedPet?.avatarUrl ?? '';
   const petActivities = activities.filter((activity) => activity.petId === selectedPet?.id);
@@ -100,10 +97,10 @@ export const HomePage = () => {
   return (
     <PageLayout
       title={`Good Morning, ${petName}!`}
-      subtitle="Here is what we have lined up for the day."
-      actions={<Link to="/activity" className="text-sm font-semibold text-brand-primary">Log training</Link>}
+      subtitle="Here’s today’s focus and how you’re progressing."
+      actions={<Link to="/activity" className="text-sm font-semibold text-brand-primary">Start today’s training</Link>}
     >
-      <Card padding="lg" className="border border-brand-accent/20 bg-gradient-to-br from-brand-accent/10 via-white to-white shadow-lg">
+      <Card padding="lg" className="border border-brand-accent/25 bg-gradient-to-br from-brand-accent/15 via-white to-white shadow-xl">
         <div className="space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
@@ -111,7 +108,7 @@ export const HomePage = () => {
               <h3 className="text-xl font-semibold text-brand-primary">Build focus with {petName}.</h3>
               <p className="text-sm text-text-secondary">
                 {hasTrainingToday
-                  ? 'Nice work — you already logged training today.'
+                  ? 'Nice work — today’s training is in.'
                   : 'Start a short session to keep the streak alive.'}
               </p>
             </div>
@@ -119,9 +116,10 @@ export const HomePage = () => {
               <span className="rounded-full border border-brand-border bg-white px-3 py-1 text-xs font-semibold text-brand-primary">
                 Streak {trainingStreak} day{trainingStreak === 1 ? '' : 's'}
               </span>
-              <span className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+              <span
+                className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
                 hasTrainingToday ? 'bg-emerald-100 text-emerald-700' : 'bg-brand-subtle text-text-secondary'
-              }`}
+                }`}
               >
                 <span className="relative flex h-4 w-4 items-center justify-center">
                   {hasTrainingToday && (
@@ -176,7 +174,7 @@ export const HomePage = () => {
                   to="/activity"
                   className="inline-flex items-center justify-center rounded-full border border-brand-border bg-white px-4 py-2 text-sm font-semibold text-brand-primary hover:border-brand-primary"
                 >
-                  View history
+                  View progress
                 </Link>
               </div>
             </div>
@@ -206,8 +204,8 @@ export const HomePage = () => {
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Today</p>
-              <h3 className="text-lg font-semibold text-brand-primary">What’s up for {petName}</h3>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Today snapshot</p>
+              <h3 className="text-lg font-semibold text-brand-primary">Everything else in one glance</h3>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -269,51 +267,9 @@ export const HomePage = () => {
               )}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              to="/activity"
-              className="inline-flex flex-1 min-w-[8rem] items-center justify-center rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-brand-primary/95 focus:outline-none focus:ring-2 focus:ring-brand-primary/50"
-            >
-              Start activity
-            </Link>
-            <Link
-              to="/journal"
-              className="inline-flex flex-1 min-w-[8rem] items-center justify-center rounded-full border border-brand-border bg-white px-4 py-2 text-sm font-semibold text-brand-primary shadow-sm transition hover:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-            >
-              Write journal
-            </Link>
-            <Link
-              to="/calendar"
-              className="inline-flex flex-1 min-w-[8rem] items-center justify-center rounded-full border border-brand-border bg-white px-4 py-2 text-sm font-semibold text-brand-primary shadow-sm transition hover:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-            >
-              Add reminder
-            </Link>
-          </div>
         </div>
       </Card>
 
-      {nextLaunchTask && (
-        <Card padding="lg" className="border border-brand-border bg-gradient-to-br from-brand-subtle/70 to-white">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Next Launch Task</p>
-              <h3 className="mt-1 text-lg font-semibold text-brand-primary">{nextLaunchTask.title}</h3>
-              <p className="text-xs text-text-secondary">
-                {nextLaunchTask.category} · {nextLaunchTask.priority} priority
-              </p>
-              {nextLaunchTask.dueDate && (
-                <p className="text-xs text-text-muted">Due {formatDate(nextLaunchTask.dueDate)}</p>
-              )}
-            </div>
-            <Link
-              to="/launch"
-              className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-primary/90"
-            >
-              Open Launch Hub
-            </Link>
-          </div>
-        </Card>
-      )}
       {!onboarding.completed && (
         <Card padding="md" className="border border-brand-border bg-white/90 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -368,7 +324,7 @@ export const HomePage = () => {
       )}
 
       <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
-        <Card className="flex flex-col gap-4 border-0 bg-gradient-to-br from-brand-accent to-brand-accentDeep text-white shadow-xl p-4 sm:p-6" padding="md">
+        <Card className="flex flex-col gap-4 border border-brand-border bg-white/90 shadow-sm p-4 sm:p-6" padding="md">
           <div className="flex items-center gap-3">
             <PetAvatar
               name={selectedPet?.name}
@@ -378,9 +334,9 @@ export const HomePage = () => {
               className="rounded-2xl"
             />
             <div>
-              <p className="text-sm text-brand-accentSoft/80">Daily Summary</p>
-              <h3 className="text-2xl font-semibold text-white">{petName}&apos;s Agenda</h3>
-              <p className="text-sm text-white/80">Walks, meals, and mood all in one place.</p>
+              <p className="text-xs text-text-muted">Daily Summary</p>
+              <h3 className="text-2xl font-semibold text-brand-primary">{petName}&apos;s Agenda</h3>
+              <p className="text-sm text-text-secondary">Walks, meals, and mood in one place.</p>
             </div>
           </div>
           <div className="grid min-w-0 gap-2 sm:gap-3 sm:grid-cols-3">
@@ -396,10 +352,10 @@ export const HomePage = () => {
         </Card>
         <Card padding="md" className="border-0 bg-brand-ice/50 p-4 sm:p-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-brand-primary">Quick Actions</h3>
+            <h3 className="text-lg font-semibold text-brand-primary">More actions</h3>
             <PawPrint className="text-brand-accent" />
           </div>
-          <div className="mt-4 flex flex-wrap gap-2 sm:grid sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
+          <div className="mt-4 flex flex-wrap gap-2 sm:grid sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
             {quickActions.map((action) => (
               <Link
                 key={action.label}

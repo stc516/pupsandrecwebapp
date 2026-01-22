@@ -1,4 +1,4 @@
-import { addDays, addMonths, differenceInCalendarDays, differenceInCalendarMonths, format, startOfDay, subMonths } from 'date-fns';
+import { addDays, addMonths, differenceInCalendarDays, differenceInCalendarMonths, startOfDay, subMonths } from 'date-fns';
 import { useMemo, useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, Dumbbell, NotebookPen, Pencil, Repeat, Sparkles, Trash2 } from 'lucide-react';
@@ -19,9 +19,6 @@ type ReminderType = (typeof reminderTypes)[number];
 type RecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly';
 
 const defaultRecurrence = { frequency: 'none' as RecurrenceFrequency, interval: 1, until: '' };
-const NOTES_KEY = 'calendarNotes:v1';
-
-type CalendarNotes = Record<string, string>;
 
 const occursOnDate = (reminder: Reminder, date: Date) => {
   const start = new Date(reminder.dateTime);
@@ -70,19 +67,6 @@ const recurrenceLabel = (recurrence?: Reminder['recurrence']) => {
   return `${label}${untilLabel}`;
 };
 
-const loadCalendarNotes = (): CalendarNotes => {
-  if (typeof window === 'undefined') return {};
-  try {
-    const stored = window.localStorage.getItem(NOTES_KEY);
-    if (!stored) return {};
-    const parsed = JSON.parse(stored) as CalendarNotes;
-    return parsed ?? {};
-  } catch (error) {
-    console.warn('Failed to load calendar notes', error);
-    return {};
-  }
-};
-
 export const CalendarPage = () => {
   const {
     reminders,
@@ -112,8 +96,6 @@ export const CalendarPage = () => {
     recurrence: { ...defaultRecurrence },
   });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
-  const [calendarNotes, setCalendarNotes] = useState<CalendarNotes>(() => loadCalendarNotes());
-  const [noteDraft, setNoteDraft] = useState('');
 
   const monthMatrix = useMemo(() => buildMonthMatrix(currentMonth), [currentMonth]);
   const dayReminders = reminders.filter(
@@ -154,20 +136,6 @@ export const CalendarPage = () => {
     }
     return streak;
   }, [trainingActivities]);
-  const noteKey = useMemo(() => {
-    if (!selectedPetId) return null;
-    return `${selectedPetId}:${format(selectedDate, 'yyyy-MM-dd')}`;
-  }, [selectedDate, selectedPetId]);
-  const notesDisabled = !selectedPetId;
-
-  useEffect(() => {
-    setNoteDraft(noteKey ? calendarNotes[noteKey] ?? '' : '');
-  }, [calendarNotes, noteKey]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(NOTES_KEY, JSON.stringify(calendarNotes));
-  }, [calendarNotes]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -288,21 +256,6 @@ export const CalendarPage = () => {
     pushToast({ tone: 'success', message: 'Reminder deleted.' });
   };
 
-  const handleSaveNote = () => {
-    if (!noteKey) return;
-    const trimmed = noteDraft.trim();
-    setCalendarNotes((prev) => {
-      const next = { ...prev };
-      if (trimmed) {
-        next[noteKey] = trimmed;
-      } else {
-        delete next[noteKey];
-      }
-      return next;
-    });
-    pushToast({ tone: 'success', message: trimmed ? 'Note saved.' : 'Note cleared.' });
-  };
-
   return (
     <PageLayout title="Calendar" subtitle="Plan your walks, vet visits, and reminders">
       <div className="grid gap-4 lg:grid-cols-3">
@@ -317,7 +270,7 @@ export const CalendarPage = () => {
             </button>
             <div className="flex-1 text-center">
               <p className="text-lg font-semibold text-brand-primary">{formatDate(currentMonth, 'MMMM yyyy')}</p>
-              <p className="text-xs text-text-muted">Tap a day to view reminders</p>
+              <p className="text-xs text-text-muted">Pick a day to plan training and reminders</p>
             </div>
             <button
               className="rounded-full border border-brand-border p-2"
@@ -581,7 +534,7 @@ export const CalendarPage = () => {
                             className="inline-flex items-center gap-1 rounded-full border border-brand-border px-2.5 py-1 text-xs font-semibold text-brand-primary"
                           >
                             <Pencil size={12} />
-                            Edit inline
+                            Edit
                           </button>
                           <button
                             type="button"
@@ -600,9 +553,9 @@ export const CalendarPage = () => {
               {dayReminders.length === 0 && (
                 <div className="space-y-2 rounded-2xl bg-brand-subtle p-4 text-sm text-text-secondary">
                   <p className="font-semibold text-brand-primary">
-                    No reminders for {selectedPet?.name ?? 'this pet'} on this day.
+                    No reminders yet for {selectedPet?.name ?? 'this pet'}.
                   </p>
-                  <p>Keep walks, meds, and vet visits on track.</p>
+                  <p>Add one so today stays smooth and predictable.</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -620,37 +573,120 @@ export const CalendarPage = () => {
                 </div>
               )}
             </div>
+            <div className="mt-6 border-t border-brand-border pt-6">
+              <h4 className="text-base font-semibold text-brand-primary">Add a reminder</h4>
+              <form className="mt-4 space-y-4" data-reminder-form="add" onSubmit={handleSubmit}>
+                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                  Title
+                  <input
+                    className={fieldClasses(Boolean(errors.title))}
+                    value={formState.title}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, title: event.target.value }))}
+                    aria-invalid={Boolean(errors.title)}
+                  />
+                  {errors.title && <p className="mt-1 text-xs text-red-500">{errors.title}</p>}
+                </label>
+                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                  Type
+                  <select
+                    className={fieldClasses(false)}
+                    value={formState.type}
+                    onChange={(event) =>
+                      setFormState((prev) => ({ ...prev, type: event.target.value as ReminderType }))
+                    }
+                  >
+                    {reminderTypes.map((type) => (
+                      <option key={type}>{type}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                  When
+                  <input
+                    type="datetime-local"
+                    className={fieldClasses(Boolean(errors.dateTime))}
+                    value={formState.dateTime}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, dateTime: event.target.value }))}
+                    aria-invalid={Boolean(errors.dateTime)}
+                  />
+                  {errors.dateTime && <p className="mt-1 text-xs text-red-500">{errors.dateTime}</p>}
+                </label>
+                <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                  Repeats
+                  <select
+                    className={fieldClasses(false)}
+                    value={formState.recurrence.frequency}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        recurrence: { ...prev.recurrence, frequency: event.target.value as RecurrenceFrequency },
+                      }))
+                    }
+                  >
+                    <option value="none">Does not repeat</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </label>
+                {formState.recurrence.frequency !== 'none' && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                      Every
+                      <input
+                        type="number"
+                        min={1}
+                        className={fieldClasses(false)}
+                        value={formState.recurrence.interval}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            recurrence: { ...prev.recurrence, interval: Number(event.target.value) || 1 },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="flex flex-col text-sm font-medium text-brand-primary/90">
+                      Ends (optional)
+                      <input
+                        type="date"
+                        className={fieldClasses(false)}
+                        value={formState.recurrence.until}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            recurrence: { ...prev.recurrence, until: event.target.value },
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                )}
+                <PrimaryButton type="submit" startIcon={<CalendarDays size={16} />}>
+                  Save reminder
+                </PrimaryButton>
+                <SecondaryButton
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    setSelectedDate(now);
+                    setCurrentMonth(now);
+                  }}
+                >
+                  Jump to today
+                </SecondaryButton>
+              </form>
+            </div>
           </Card>
           <Card padding="lg">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-brand-primary">Notes & Actions</h3>
-                <p className="text-xs text-text-secondary">Capture the day or set your next step.</p>
+                <h3 className="text-lg font-semibold text-brand-primary">Actions</h3>
+                <p className="text-xs text-text-secondary">Keep the loop moving with one clear next step.</p>
               </div>
               <Sparkles size={18} className="text-brand-accent" />
             </div>
             <div className="mt-4 space-y-3">
-              <label className="flex flex-col gap-2 text-sm font-medium text-brand-primary/90">
-                Day note
-                <textarea
-                  value={noteDraft}
-                  onChange={(event) => setNoteDraft(event.target.value)}
-                  placeholder="Add a quick note for this day..."
-                  disabled={notesDisabled}
-                  className="min-h-[90px] rounded-2xl border border-brand-border bg-white px-3 py-2 text-sm text-brand-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-accent disabled:cursor-not-allowed disabled:bg-slate-50"
-                />
-              </label>
-              {notesDisabled && (
-                <p className="text-xs text-text-secondary">Select a pet to add notes.</p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <PrimaryButton type="button" onClick={handleSaveNote} disabled={notesDisabled}>
-                  Save note
-                </PrimaryButton>
-                <SecondaryButton type="button" onClick={() => setNoteDraft('')} disabled={notesDisabled}>
-                  Clear
-                </SecondaryButton>
-              </div>
               <div className="grid gap-2 text-xs text-text-secondary sm:grid-cols-2">
                 <Link
                   to="/activity"
@@ -666,110 +702,23 @@ export const CalendarPage = () => {
                   <NotebookPen size={14} />
                   Write journal
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const form = document.querySelector('form[data-reminder-form="add"]') as HTMLFormElement | null;
+                    if (form) {
+                      form.scrollIntoView({ behavior: 'smooth' });
+                      const input = form.querySelector('input, select, textarea') as HTMLElement | null;
+                      if (input) input.focus();
+                    }
+                  }}
+                  className="flex items-center gap-2 rounded-2xl border border-brand-border bg-white px-3 py-2 text-sm font-semibold text-brand-primary"
+                >
+                  <CalendarDays size={14} />
+                  Add reminder
+                </button>
               </div>
             </div>
-          </Card>
-          <Card padding="lg" data-reminder-form="add">
-            <h3 className="text-lg font-semibold text-brand-primary">Add Reminder</h3>
-            <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
-              <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                Title
-                <input
-                  className={fieldClasses(Boolean(errors.title))}
-                  value={formState.title}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, title: event.target.value }))}
-                  aria-invalid={Boolean(errors.title)}
-                />
-                {errors.title && <p className="mt-1 text-xs text-red-500">{errors.title}</p>}
-              </label>
-              <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                Type
-                <select
-                  className={fieldClasses(false)}
-                  value={formState.type}
-                  onChange={(event) =>
-                    setFormState((prev) => ({ ...prev, type: event.target.value as ReminderType }))
-                  }
-                >
-                  {reminderTypes.map((type) => (
-                    <option key={type}>{type}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                When
-                <input
-                  type="datetime-local"
-                  className={fieldClasses(Boolean(errors.dateTime))}
-                  value={formState.dateTime}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, dateTime: event.target.value }))}
-                  aria-invalid={Boolean(errors.dateTime)}
-                />
-                {errors.dateTime && <p className="mt-1 text-xs text-red-500">{errors.dateTime}</p>}
-              </label>
-              <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                Repeats
-                <select
-                  className={fieldClasses(false)}
-                  value={formState.recurrence.frequency}
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      recurrence: { ...prev.recurrence, frequency: event.target.value as RecurrenceFrequency },
-                    }))
-                  }
-                >
-                  <option value="none">Does not repeat</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-              </label>
-              {formState.recurrence.frequency !== 'none' && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                    Every
-                    <input
-                      type="number"
-                      min={1}
-                      className={fieldClasses(false)}
-                      value={formState.recurrence.interval}
-                      onChange={(event) =>
-                        setFormState((prev) => ({
-                          ...prev,
-                          recurrence: { ...prev.recurrence, interval: Number(event.target.value) || 1 },
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className="flex flex-col text-sm font-medium text-brand-primary/90">
-                    Ends (optional)
-                    <input
-                      type="date"
-                      className={fieldClasses(false)}
-                      value={formState.recurrence.until}
-                      onChange={(event) =>
-                        setFormState((prev) => ({
-                          ...prev,
-                          recurrence: { ...prev.recurrence, until: event.target.value },
-                        }))
-                      }
-                    />
-                  </label>
-                </div>
-              )}
-              <PrimaryButton type="submit" startIcon={<CalendarDays size={16} />}>Save Reminder</PrimaryButton>
-              <SecondaryButton
-                type="button"
-                onClick={() => {
-                  const now = new Date();
-                  setSelectedDate(now);
-                  setCurrentMonth(now);
-                }}
-              >
-                Jump to today
-              </SecondaryButton>
-            </form>
           </Card>
         </div>
       </div>
