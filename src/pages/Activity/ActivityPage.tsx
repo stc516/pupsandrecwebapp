@@ -202,7 +202,10 @@ export const ActivityPage = () => {
       });
       setFormState((prev) => ({ ...prev, notes: '', photoUrl: '' }));
       setErrors({});
-      pushToast({ tone: 'success', message: 'Activity saved.' });
+      pushToast({
+        tone: 'success',
+        message: formState.type === 'training' ? 'Training logged — nice work!' : 'Activity saved.',
+      });
     } catch (error) {
       pushToast({
         tone: 'error',

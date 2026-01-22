@@ -21,7 +21,7 @@ export const PetSwitcher = () => {
       <div className="flex flex-col">
         <span className="text-xs text-text-muted">Pet</span>
         <select
-          className="pointer-events-auto cursor-pointer bg-transparent text-sm font-semibold text-brand-primary focus:outline-none"
+          className="pointer-events-auto cursor-pointer appearance-none bg-transparent pr-6 text-sm font-semibold text-brand-primary focus:outline-none"
           value={currentValue}
           onChange={(event) => {
             if (disabled) return;
@@ -38,7 +38,7 @@ export const PetSwitcher = () => {
           ))}
         </select>
       </div>
-      <ChevronDown size={16} className="text-brand-primary" />
+      <ChevronDown size={16} className="pointer-events-none text-brand-primary" />
     </div>
   );
 };

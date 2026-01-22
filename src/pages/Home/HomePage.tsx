@@ -1,4 +1,5 @@
-import { CalendarDays, Clock, Compass, Heart, MapPinned, NotebookPen, PawPrint } from 'lucide-react';
+import { addDays, startOfDay } from 'date-fns';
+import { CalendarDays, CheckCircle2, Clock, Compass, Dumbbell, Heart, MapPinned, NotebookPen, PawPrint, Sparkles } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -6,12 +7,13 @@ import { Card } from '../../components/ui/Card';
 import { StatPill } from '../../components/ui/StatPill';
 import { PageLayout } from '../../layouts/PageLayout';
 import { useAppState } from '../../hooks/useAppState';
-import { formatDate } from '../../utils/dates';
+import { formatDate, formatTime, sameDay } from '../../utils/dates';
 import { PetAvatar } from '../../components/ui/PetAvatar';
 import { useOnboarding } from '../../context/OnboardingContext';
 import { useLaunchHub } from '../../context/LaunchHubContext';
 
 const quickActions = [
+  { label: 'Log Training', icon: <Dumbbell size={16} />, to: '/activity' },
   { label: 'Start Walk', icon: <MapPinned size={16} />, to: '/activity' },
   { label: 'Journal Entry', icon: <NotebookPen size={16} />, to: '/journal' },
   { label: 'View Calendar', icon: <CalendarDays size={16} />, to: '/calendar' },
@@ -42,6 +44,41 @@ export const HomePage = () => {
   const lastJournalEntry = journalEntries.find((entry) => entry.petId === selectedPet?.id);
   const lastActivity = petActivities[0];
   const nextReminder = petReminders[0];
+  const trainingActivities = useMemo(
+    () => petActivities.filter((activity) => activity.type === 'training'),
+    [petActivities],
+  );
+  const todayTraining = useMemo(
+    () => trainingActivities.filter((activity) => sameDay(activity.date, new Date())),
+    [trainingActivities],
+  );
+  const hasTrainingToday = todayTraining.length > 0;
+  const trainingStreak = useMemo(() => {
+    if (trainingActivities.length === 0) return 0;
+    const daySet = new Set(trainingActivities.map((activity) => startOfDay(new Date(activity.date)).getTime()));
+    let streak = 0;
+    let cursor = startOfDay(new Date());
+    while (daySet.has(cursor.getTime())) {
+      streak += 1;
+      cursor = addDays(cursor, -1);
+    }
+    return streak;
+  }, [trainingActivities]);
+  const trainingWeekSummary = useMemo(() => {
+    const cutoff = addDays(startOfDay(new Date()), -6).getTime();
+    let minutes = 0;
+    const daySet = new Set<number>();
+    trainingActivities.forEach((activity) => {
+      const day = startOfDay(new Date(activity.date)).getTime();
+      if (day >= cutoff) {
+        daySet.add(day);
+        minutes += activity.durationMinutes ?? 0;
+      }
+    });
+    return { dayCount: daySet.size, minutes };
+  }, [trainingActivities]);
+  const weeklyGoal = 3;
+  const weeklyProgress = Math.min(1, trainingWeekSummary.dayCount / weeklyGoal);
 
   const checklist = {
     petAdded: Boolean(selectedPet?.id),
@@ -64,8 +101,107 @@ export const HomePage = () => {
     <PageLayout
       title={`Good Morning, ${petName}!`}
       subtitle="Here is what we have lined up for the day."
-      actions={<Link to="/activity" className="text-sm font-semibold text-brand-primary">Start an activity</Link>}
+      actions={<Link to="/activity" className="text-sm font-semibold text-brand-primary">Log training</Link>}
     >
+      <Card padding="lg" className="border border-brand-accent/20 bg-gradient-to-br from-brand-accent/10 via-white to-white shadow-lg">
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Today&apos;s Training</p>
+              <h3 className="text-xl font-semibold text-brand-primary">Build focus with {petName}.</h3>
+              <p className="text-sm text-text-secondary">
+                {hasTrainingToday
+                  ? 'Nice work — you already logged training today.'
+                  : 'Start a short session to keep the streak alive.'}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-brand-border bg-white px-3 py-1 text-xs font-semibold text-brand-primary">
+                Streak {trainingStreak} day{trainingStreak === 1 ? '' : 's'}
+              </span>
+              <span className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                hasTrainingToday ? 'bg-emerald-100 text-emerald-700' : 'bg-brand-subtle text-text-secondary'
+              }`}
+              >
+                <span className="relative flex h-4 w-4 items-center justify-center">
+                  {hasTrainingToday && (
+                    <span className="absolute h-4 w-4 animate-ping rounded-full bg-emerald-400/40" />
+                  )}
+                  {hasTrainingToday ? (
+                    <CheckCircle2 size={14} className="relative" />
+                  ) : (
+                    <Sparkles size={14} className="relative text-brand-primary/70" />
+                  )}
+                </span>
+                {hasTrainingToday ? 'Training complete' : 'Ready to train'}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl border border-brand-border bg-white/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Today&apos;s sessions</p>
+              {hasTrainingToday ? (
+                <div className="mt-3 space-y-3">
+                  {todayTraining.map((activity) => (
+                    <div key={activity.id} className="flex items-center justify-between gap-3 rounded-xl border border-brand-border bg-brand-subtle/40 px-3 py-2">
+                      <div>
+                        <p className="text-sm font-semibold text-brand-primary">Training session</p>
+                        <p className="text-xs text-text-secondary">{formatTime(activity.date)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-text-secondary">
+                        {activity.durationMinutes ? <span>{activity.durationMinutes} min</span> : null}
+                        <span className="flex items-center gap-1 text-emerald-600">
+                          <CheckCircle2 size={14} />
+                          Done
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2 text-sm text-text-secondary">
+                  <p>No training logged yet.</p>
+                  <p>Try a 10-minute focus session or leash warm-up.</p>
+                </div>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  to="/activity"
+                  className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-primary/90"
+                >
+                  Log training
+                </Link>
+                <Link
+                  to="/activity"
+                  className="inline-flex items-center justify-center rounded-full border border-brand-border bg-white px-4 py-2 text-sm font-semibold text-brand-primary hover:border-brand-primary"
+                >
+                  View history
+                </Link>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-brand-border bg-white/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Weekly rhythm</p>
+              <div className="mt-3 flex items-center justify-between text-sm text-text-secondary">
+                <span>{trainingWeekSummary.dayCount} / {weeklyGoal} training days</span>
+                <span>{trainingWeekSummary.minutes} min</span>
+              </div>
+              <div className="mt-3 h-2 w-full rounded-full bg-brand-border">
+                <div
+                  className="h-full rounded-full bg-brand-accent transition-all"
+                  style={{ width: `${Math.round(weeklyProgress * 100)}%` }}
+                />
+              </div>
+              <div className="mt-4 rounded-xl border border-brand-border bg-brand-subtle/50 px-3 py-2 text-xs text-text-secondary">
+                {trainingWeekSummary.dayCount >= weeklyGoal
+                  ? 'You hit your weekly rhythm — keep the momentum.'
+                  : `Aim for ${weeklyGoal - trainingWeekSummary.dayCount} more day${weeklyGoal - trainingWeekSummary.dayCount === 1 ? '' : 's'} this week.`}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <Card data-tour="home-today" padding="lg" className="border border-brand-accent/15 bg-gradient-to-br from-brand-subtle to-white shadow-lg">
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
@@ -263,7 +399,7 @@ export const HomePage = () => {
             <h3 className="text-lg font-semibold text-brand-primary">Quick Actions</h3>
             <PawPrint className="text-brand-accent" />
           </div>
-          <div className="mt-4 flex flex-wrap gap-2 sm:grid sm:grid-cols-3 sm:gap-3">
+          <div className="mt-4 flex flex-wrap gap-2 sm:grid sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
             {quickActions.map((action) => (
               <Link
                 key={action.label}

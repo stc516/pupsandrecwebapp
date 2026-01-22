@@ -1,8 +1,9 @@
-import { addMonths, subMonths, differenceInCalendarDays, differenceInCalendarMonths, startOfDay } from 'date-fns';
+import { addDays, addMonths, differenceInCalendarDays, differenceInCalendarMonths, format, startOfDay, subMonths } from 'date-fns';
 import { useMemo, useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Pencil, Repeat, Trash2 } from 'lucide-react';
+import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, Dumbbell, NotebookPen, Pencil, Repeat, Sparkles, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
+import { Link } from 'react-router-dom';
 
 import { Card } from '../../components/ui/Card';
 import { PrimaryButton, SecondaryButton } from '../../components/ui/Button';
@@ -18,6 +19,9 @@ type ReminderType = (typeof reminderTypes)[number];
 type RecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly';
 
 const defaultRecurrence = { frequency: 'none' as RecurrenceFrequency, interval: 1, until: '' };
+const NOTES_KEY = 'calendarNotes:v1';
+
+type CalendarNotes = Record<string, string>;
 
 const occursOnDate = (reminder: Reminder, date: Date) => {
   const start = new Date(reminder.dateTime);
@@ -66,9 +70,23 @@ const recurrenceLabel = (recurrence?: Reminder['recurrence']) => {
   return `${label}${untilLabel}`;
 };
 
+const loadCalendarNotes = (): CalendarNotes => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const stored = window.localStorage.getItem(NOTES_KEY);
+    if (!stored) return {};
+    const parsed = JSON.parse(stored) as CalendarNotes;
+    return parsed ?? {};
+  } catch (error) {
+    console.warn('Failed to load calendar notes', error);
+    return {};
+  }
+};
+
 export const CalendarPage = () => {
   const {
     reminders,
+    activities,
     selectedPetId,
     pets,
     addReminder,
@@ -94,11 +112,62 @@ export const CalendarPage = () => {
     recurrence: { ...defaultRecurrence },
   });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+  const [calendarNotes, setCalendarNotes] = useState<CalendarNotes>(() => loadCalendarNotes());
+  const [noteDraft, setNoteDraft] = useState('');
 
   const monthMatrix = useMemo(() => buildMonthMatrix(currentMonth), [currentMonth]);
   const dayReminders = reminders.filter(
     (reminder) => reminder.petId === selectedPetId && occursOnDate(reminder, selectedDate),
   );
+  const trainingActivities = useMemo(
+    () => activities.filter((activity) => activity.petId === selectedPetId && activity.type === 'training'),
+    [activities, selectedPetId],
+  );
+  const dayTraining = useMemo(
+    () =>
+      trainingActivities
+        .filter((activity) => sameDay(activity.date, selectedDate))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [selectedDate, trainingActivities],
+  );
+  const trainingWeekSummary = useMemo(() => {
+    const cutoff = addDays(startOfDay(new Date()), -6).getTime();
+    let minutes = 0;
+    const daySet = new Set<number>();
+    trainingActivities.forEach((activity) => {
+      const day = startOfDay(new Date(activity.date)).getTime();
+      if (day >= cutoff) {
+        daySet.add(day);
+        minutes += activity.durationMinutes ?? 0;
+      }
+    });
+    return { dayCount: daySet.size, minutes };
+  }, [trainingActivities]);
+  const trainingStreak = useMemo(() => {
+    if (trainingActivities.length === 0) return 0;
+    const daySet = new Set(trainingActivities.map((activity) => startOfDay(new Date(activity.date)).getTime()));
+    let streak = 0;
+    let cursor = startOfDay(new Date());
+    while (daySet.has(cursor.getTime())) {
+      streak += 1;
+      cursor = addDays(cursor, -1);
+    }
+    return streak;
+  }, [trainingActivities]);
+  const noteKey = useMemo(() => {
+    if (!selectedPetId) return null;
+    return `${selectedPetId}:${format(selectedDate, 'yyyy-MM-dd')}`;
+  }, [selectedDate, selectedPetId]);
+  const notesDisabled = !selectedPetId;
+
+  useEffect(() => {
+    setNoteDraft(noteKey ? calendarNotes[noteKey] ?? '' : '');
+  }, [calendarNotes, noteKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(NOTES_KEY, JSON.stringify(calendarNotes));
+  }, [calendarNotes]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -219,6 +288,21 @@ export const CalendarPage = () => {
     pushToast({ tone: 'success', message: 'Reminder deleted.' });
   };
 
+  const handleSaveNote = () => {
+    if (!noteKey) return;
+    const trimmed = noteDraft.trim();
+    setCalendarNotes((prev) => {
+      const next = { ...prev };
+      if (trimmed) {
+        next[noteKey] = trimmed;
+      } else {
+        delete next[noteKey];
+      }
+      return next;
+    });
+    pushToast({ tone: 'success', message: trimmed ? 'Note saved.' : 'Note cleared.' });
+  };
+
   return (
     <PageLayout title="Calendar" subtitle="Plan your walks, vet visits, and reminders">
       <div className="grid gap-4 lg:grid-cols-3">
@@ -291,8 +375,78 @@ export const CalendarPage = () => {
           </div>
         </Card>
         <div className="space-y-4">
+          <Card padding="lg" className="border border-brand-accent/15 bg-gradient-to-br from-brand-accent/10 via-white to-white">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Training</p>
+                <h3 className="text-lg font-semibold text-brand-primary">
+                  Training on {formatDate(selectedDate)}
+                </h3>
+                <p className="text-xs text-text-secondary">
+                  Streak {trainingStreak} day{trainingStreak === 1 ? '' : 's'} · {trainingWeekSummary.dayCount} training days this week
+                </p>
+              </div>
+              <Link
+                to="/activity"
+                className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-primary/90"
+              >
+                Log training
+              </Link>
+            </div>
+            <div className="mt-4 space-y-3">
+              {dayTraining.length > 0 ? (
+                dayTraining.map((activity) => (
+                  <div key={activity.id} className="flex items-center justify-between gap-3 rounded-2xl border border-brand-border bg-white/80 px-4 py-3 text-sm">
+                    <div>
+                      <p className="font-semibold text-brand-primary">Training session</p>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-text-secondary">
+                        <Clock size={12} /> {formatTime(activity.date)}
+                      </p>
+                      {activity.notes && <p className="mt-1 text-xs text-text-muted">{activity.notes}</p>}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-text-secondary">
+                      {activity.durationMinutes ? <TagChip>{activity.durationMinutes} min</TagChip> : null}
+                      <span className="flex items-center gap-1 text-emerald-600">
+                        <span className="relative flex h-4 w-4 items-center justify-center">
+                          <span className="absolute h-4 w-4 animate-ping rounded-full bg-emerald-300/40" />
+                          <CheckCircle2 size={14} className="relative" />
+                        </span>
+                        Done
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="space-y-2 rounded-2xl border border-dashed border-brand-border bg-white/60 p-4 text-sm text-text-secondary">
+                  <div className="flex items-center gap-2 text-brand-primary">
+                    <Dumbbell size={16} />
+                    <span className="text-sm font-semibold">No training logged yet.</span>
+                  </div>
+                  <p>Keep the rhythm — even 10 minutes counts.</p>
+                </div>
+              )}
+            </div>
+          </Card>
           <Card padding="lg">
-            <h3 className="text-lg font-semibold text-brand-primary">Reminders on {formatDate(selectedDate)}</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-lg font-semibold text-brand-primary">Reminders</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  const form = document.querySelector('form[data-reminder-form="add"]') as HTMLFormElement | null;
+                  if (form) {
+                    form.scrollIntoView({ behavior: 'smooth' });
+                    const input = form.querySelector('input, select, textarea') as HTMLElement | null;
+                    if (input) input.focus();
+                  }
+                }}
+                className="inline-flex items-center gap-1 rounded-full border border-brand-border px-3 py-1 text-xs font-semibold text-brand-primary"
+              >
+                <CalendarDays size={12} />
+                Add reminder
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-text-secondary">For {formatDate(selectedDate)}</p>
             <div className="mt-3 space-y-3">
               {dayReminders.map((reminder) => {
                 const isEditing = editingReminderId === reminder.id;
@@ -465,6 +619,54 @@ export const CalendarPage = () => {
                   </button>
                 </div>
               )}
+            </div>
+          </Card>
+          <Card padding="lg">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-brand-primary">Notes & Actions</h3>
+                <p className="text-xs text-text-secondary">Capture the day or set your next step.</p>
+              </div>
+              <Sparkles size={18} className="text-brand-accent" />
+            </div>
+            <div className="mt-4 space-y-3">
+              <label className="flex flex-col gap-2 text-sm font-medium text-brand-primary/90">
+                Day note
+                <textarea
+                  value={noteDraft}
+                  onChange={(event) => setNoteDraft(event.target.value)}
+                  placeholder="Add a quick note for this day..."
+                  disabled={notesDisabled}
+                  className="min-h-[90px] rounded-2xl border border-brand-border bg-white px-3 py-2 text-sm text-brand-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-accent disabled:cursor-not-allowed disabled:bg-slate-50"
+                />
+              </label>
+              {notesDisabled && (
+                <p className="text-xs text-text-secondary">Select a pet to add notes.</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <PrimaryButton type="button" onClick={handleSaveNote} disabled={notesDisabled}>
+                  Save note
+                </PrimaryButton>
+                <SecondaryButton type="button" onClick={() => setNoteDraft('')} disabled={notesDisabled}>
+                  Clear
+                </SecondaryButton>
+              </div>
+              <div className="grid gap-2 text-xs text-text-secondary sm:grid-cols-2">
+                <Link
+                  to="/activity"
+                  className="flex items-center gap-2 rounded-2xl border border-brand-border bg-brand-subtle/60 px-3 py-2 text-sm font-semibold text-brand-primary"
+                >
+                  <Dumbbell size={14} />
+                  Log training
+                </Link>
+                <Link
+                  to="/journal"
+                  className="flex items-center gap-2 rounded-2xl border border-brand-border bg-brand-subtle/60 px-3 py-2 text-sm font-semibold text-brand-primary"
+                >
+                  <NotebookPen size={14} />
+                  Write journal
+                </Link>
+              </div>
             </div>
           </Card>
           <Card padding="lg" data-reminder-form="add">
