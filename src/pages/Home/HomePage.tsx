@@ -1,5 +1,5 @@
 import { CalendarDays, Clock, Compass, Heart, MapPinned, NotebookPen, PawPrint } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
 import { Card } from '../../components/ui/Card';
@@ -9,6 +9,7 @@ import { useAppState } from '../../hooks/useAppState';
 import { formatDate } from '../../utils/dates';
 import { PetAvatar } from '../../components/ui/PetAvatar';
 import { useOnboarding } from '../../context/OnboardingContext';
+import { useLaunchHub } from '../../context/LaunchHubContext';
 
 const quickActions = [
   { label: 'Start Walk', icon: <MapPinned size={16} />, to: '/activity' },
@@ -19,6 +20,7 @@ const quickActions = [
 export const HomePage = () => {
   const { selectedPet, activities, journalEntries, reminders, xp } = useAppState();
   const { state: onboarding, startTour, closeTour, setChecklist, resetOnboarding } = useOnboarding();
+  const { getNextTask } = useLaunchHub();
   const petName = selectedPet?.name ?? 'your pup';
   const petAvatar = selectedPet?.avatarUrl ?? '';
   const petActivities = activities.filter((activity) => activity.petId === selectedPet?.id);
@@ -53,6 +55,8 @@ export const HomePage = () => {
     if (onboarding.completed) return;
     setChecklist(checklist).catch(() => {});
   }, [checklist.activityLogged, checklist.avatarUploaded, checklist.journalWritten, checklist.petAdded, checklist.reminderAdded, onboarding.completed, setChecklist]);
+
+  const nextLaunchTask = useMemo(() => getNextTask(), [getNextTask]);
 
   const showReset = import.meta.env.DEV || import.meta.env.VITE_SMOKE_ENABLED === 'true';
 
@@ -152,6 +156,28 @@ export const HomePage = () => {
         </div>
       </Card>
 
+      {nextLaunchTask && (
+        <Card padding="lg" className="border border-brand-border bg-gradient-to-br from-brand-subtle/70 to-white">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Next Launch Task</p>
+              <h3 className="mt-1 text-lg font-semibold text-brand-primary">{nextLaunchTask.title}</h3>
+              <p className="text-xs text-text-secondary">
+                {nextLaunchTask.category} · {nextLaunchTask.priority} priority
+              </p>
+              {nextLaunchTask.dueDate && (
+                <p className="text-xs text-text-muted">Due {formatDate(nextLaunchTask.dueDate)}</p>
+              )}
+            </div>
+            <Link
+              to="/launch"
+              className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-primary/90"
+            >
+              Open Launch Hub
+            </Link>
+          </div>
+        </Card>
+      )}
       {!onboarding.completed && (
         <Card padding="md" className="border border-brand-border bg-white/90 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">

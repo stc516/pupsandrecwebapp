@@ -55,7 +55,45 @@ export interface Reminder {
     until?: string; // ISO end date
   };
 }
+export type LaunchTaskCategory =
+  | 'Ship'
+  | 'Analytics'
+  | 'App Store/PWA'
+  | 'Content'
+  | 'Outbound'
+  | 'Community'
+  | 'Partnerships';
 
+export type LaunchTaskPriority = 'Low' | 'Medium' | 'High';
+export type LaunchTaskStatus = 'todo' | 'doing' | 'done' | 'archived';
+
+export interface LaunchTask {
+  id: string;
+  title: string;
+  category: LaunchTaskCategory;
+  priority: LaunchTaskPriority;
+  status: LaunchTaskStatus;
+  notes?: string;
+  dueDate?: string;
+  createdAtISO: string;
+}
+
+export type GrowthExperimentStatus = 'idea' | 'running' | 'done' | 'archived';
+
+export interface GrowthExperiment {
+  id: string;
+  title: string;
+  hypothesis: string;
+  channel: string;
+  audience: string;
+  message: string;
+  kpi: string;
+  status: GrowthExperimentStatus;
+  startISO?: string;
+  endISO?: string;
+  results?: string;
+  notes?: string;
+}
 export type AchievementCondition =
   | 'first-walk'
   | 'journal-count'
