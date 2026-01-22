@@ -90,8 +90,6 @@ export const HomePage = () => {
     setChecklist(checklist).catch(() => {});
   }, [checklist.activityLogged, checklist.avatarUploaded, checklist.journalWritten, checklist.petAdded, checklist.reminderAdded, onboarding.completed, setChecklist]);
 
-  const nextLaunchTask = useMemo(() => getNextTask(), [getNextTask]);
-
   const showReset = import.meta.env.DEV || import.meta.env.VITE_SMOKE_ENABLED === 'true';
 
   return (
