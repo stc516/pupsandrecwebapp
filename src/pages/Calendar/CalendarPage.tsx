@@ -1,5 +1,6 @@
 import { addMonths, subMonths, differenceInCalendarDays, differenceInCalendarMonths, startOfDay } from 'date-fns';
 import { useMemo, useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import type { FormEvent } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Pencil, Repeat, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
@@ -12,6 +13,8 @@ import { useAppState } from '../../hooks/useAppState';
 import { buildMonthMatrix, formatDate, formatTime, sameDay } from '../../utils/dates';
 import { useToast } from '../../components/ui/ToastProvider';
 import { useTraining } from '../../context/TrainingContext';
+import { useTrainingPlan } from '../../context/TrainingPlanContext';
+import { getPlanDayForDate } from '../../components/training/trainingPlanSelectors';
 import type { Reminder } from '../../types';
 
 const reminderTypes = ['walk', 'vet-appointment', 'medication', 'grooming', 'other'] as const;
@@ -79,6 +82,7 @@ export const CalendarPage = () => {
   const selectedPet = pets.find((pet) => pet.id === selectedPetId) ?? null;
   const { pushToast } = useToast();
   const { sessions: trainingSessions } = useTraining();
+  const { getPlanForPet } = useTrainingPlan();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [formState, setFormState] = useState({
@@ -109,6 +113,14 @@ export const CalendarPage = () => {
         .sort((a, b) => new Date(a.dateTimeISO).getTime() - new Date(b.dateTimeISO).getTime()),
     [selectedPetId, selectedDate, trainingSessions],
   );
+  const trainingPlanInfo = useMemo(
+    () => (selectedPetId ? getPlanForPet(selectedPetId) : null),
+    [getPlanForPet, selectedPetId],
+  );
+  const planDay =
+    trainingPlanInfo?.plan && trainingPlanInfo.petState.startDateISO
+      ? getPlanDayForDate(trainingPlanInfo.plan, trainingPlanInfo.petState.startDateISO, selectedDate)
+      : null;
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -305,6 +317,22 @@ export const CalendarPage = () => {
           <Card padding="lg">
             <h3 className="text-lg font-semibold text-brand-primary">Reminders on {formatDate(selectedDate)}</h3>
             <div className="mt-3 space-y-3">
+              {planDay && trainingPlanInfo?.plan && (
+                <Link
+                  to="/training"
+                  className="block rounded-2xl border border-brand-border bg-brand-subtle/70 p-3 text-sm text-brand-primary transition hover:border-brand-primary"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Training plan</p>
+                  <p className="mt-1 font-semibold text-brand-primary">
+                    🐾 Training — {trainingPlanInfo.plan.title} (Day {planDay.day})
+                  </p>
+                  <div className="mt-2 space-y-1 text-xs text-text-secondary">
+                    {planDay.tasks.slice(0, 2).map((task) => (
+                      <p key={task.id}>• {task.title}</p>
+                    ))}
+                  </div>
+                </Link>
+              )}
               {dayTraining.length > 0 && (
                 <div className="space-y-2 rounded-2xl border border-brand-border bg-brand-subtle/60 p-3 text-sm text-brand-primary">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Training</p>

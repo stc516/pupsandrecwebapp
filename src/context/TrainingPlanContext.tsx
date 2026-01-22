@@ -25,6 +25,7 @@ interface TrainingPlanContextValue {
   plans: TrainingPlan[];
   state: TrainingPlanState;
   getPetState: (petId: PetId | null | undefined) => TrainingPlanPetState;
+  getPlanForPet: (petId: PetId) => { plan: TrainingPlan | null; petState: TrainingPlanPetState };
   startPlan: (petId: PetId, planId: string, startDateISO: string) => void;
   resetPlan: (petId: PetId) => void;
   restartPlan: (petId: PetId) => void;
@@ -59,6 +60,15 @@ export const TrainingPlanProvider = ({ children }: { children: ReactNode }) => {
       return state[petId] ?? createEmptyPetState();
     },
     [state],
+  );
+
+  const getPlanForPet = useCallback(
+    (petId: PetId) => {
+      const petState = getPetState(petId);
+      const plan = TRAINING_PLANS.find((item) => item.id === petState.activePlanId) ?? null;
+      return { plan, petState };
+    },
+    [getPetState],
   );
 
   const updatePetState = useCallback((petId: PetId, updater: (prev: TrainingPlanPetState) => TrainingPlanPetState) => {
@@ -140,13 +150,14 @@ export const TrainingPlanProvider = ({ children }: { children: ReactNode }) => {
       plans: TRAINING_PLANS,
       state,
       getPetState,
+      getPlanForPet,
       startPlan,
       resetPlan,
       restartPlan,
       toggleTask,
       completeDay,
     }),
-    [completeDay, getPetState, resetPlan, restartPlan, startPlan, state, toggleTask],
+    [completeDay, getPetState, getPlanForPet, resetPlan, restartPlan, startPlan, state, toggleTask],
   );
 
   return <TrainingPlanContext.Provider value={value}>{children}</TrainingPlanContext.Provider>;
