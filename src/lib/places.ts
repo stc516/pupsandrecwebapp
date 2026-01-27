@@ -1,4 +1,4 @@
-import { Loader } from '@googlemaps/js-api-loader';
+import { importLibrary, setOptions } from '@googlemaps/js-api-loader';
 
 import type { ExploreCategory, ExplorePlace } from '../types';
 
@@ -8,7 +8,7 @@ const categoryConfig: Record<ExploreCategory, { label: string; type?: string; ke
   parks: { label: 'Parks', type: 'park' },
 };
 
-let loader: Loader | null = null;
+let optionsSet = false;
 
 const getMapsApiKey = () => import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -17,13 +17,16 @@ export const loadGoogleMaps = async () => {
   if (!apiKey) {
     throw new Error('Google Maps API key is missing.');
   }
-  if (!loader) {
-    loader = new Loader({
-      apiKey,
+  if (!optionsSet) {
+    setOptions({
+      key: apiKey,
       libraries: ['places'],
     });
+    optionsSet = true;
   }
-  return loader.load();
+  await importLibrary('maps');
+  await importLibrary('places');
+  return window.google;
 };
 
 const toRadians = (value: number) => (value * Math.PI) / 180;
