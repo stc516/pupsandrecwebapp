@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@googlemaps/js-api-loader": "^2.0.2",
     "@supabase/supabase-js": "^2.90.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@babel/plugin-bugfix-firefox-class-in-computed-class-key": "^7.28.5",
     "@eslint/js": "^9.39.1",
+    "@types/google.maps": "^3.58.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",

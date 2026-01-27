@@ -55,6 +55,22 @@ export interface Reminder {
     until?: string; // ISO end date
   };
 }
+
+export type ExploreCategory = 'dog_parks' | 'trails' | 'parks';
+
+export interface ExplorePlace {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  address: string;
+  rating?: number;
+  userRatingsTotal?: number;
+  types: string[];
+  googleMapsUrl: string;
+  distanceMeters?: number;
+  categories?: ExploreCategory[];
+}
 export type LaunchTaskCategory =
   | 'Ship'
   | 'Analytics'

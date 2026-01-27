@@ -3,6 +3,7 @@ import type { ComponentType } from 'react';
 import {
   CalendarDays,
   Home,
+  MapPin,
   NotebookPen,
   PawPrint,
   Settings,
@@ -10,6 +11,7 @@ import {
   Activity,
   Newspaper,
 } from 'lucide-react';
+import { features } from '../config/features';
 
 export interface NavItem {
   label: string;
@@ -19,6 +21,7 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   { label: 'Home', path: '/', icon: Home },
+  ...(features.exploreEnabled ? [{ label: 'Explore', path: '/explore', icon: MapPin }] : []),
   { label: 'Activity', path: '/activity', icon: Activity },
   { label: 'Journal', path: '/journal', icon: NotebookPen },
   { label: 'Calendar', path: '/calendar', icon: CalendarDays },

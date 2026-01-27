@@ -23,6 +23,8 @@ import { JournalPage } from './pages/Journal/JournalPage';
 import { PetsPage } from './pages/Pets/PetsPage';
 import { SettingsPage } from './pages/Settings/SettingsPage';
 import { HealthPage } from './pages/Health/HealthPage';
+import { ExplorePage } from './pages/Explore/ExplorePage';
+import { features } from './config/features';
 
 registerSW({ immediate: true });
 
@@ -41,6 +43,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <HomePage /> },
+      ...(features.exploreEnabled ? [{ path: 'explore', element: <ExplorePage /> }] : []),
       { path: 'activity', element: <ActivityPage /> },
       { path: 'journal', element: <JournalPage /> },
       { path: 'calendar', element: <CalendarPage /> },
