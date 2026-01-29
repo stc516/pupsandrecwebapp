@@ -12,6 +12,9 @@ import { PageLayout } from '../../layouts/PageLayout';
 import { useAppState } from '../../hooks/useAppState';
 import { buildMonthMatrix, formatDate, formatTime, sameDay } from '../../utils/dates';
 import { useToast } from '../../components/ui/ToastProvider';
+import { useTraining } from '../../context/TrainingContext';
+import { useTrainingPlan } from '../../context/TrainingPlanContext';
+import { getPlanDayForDate } from '../../components/training/trainingPlanSelectors';
 import type { Reminder } from '../../types';
 
 const reminderTypes = ['walk', 'vet-appointment', 'medication', 'grooming', 'other'] as const;
@@ -79,6 +82,8 @@ export const CalendarPage = () => {
   } = useAppState();
   const selectedPet = pets.find((pet) => pet.id === selectedPetId) ?? null;
   const { pushToast } = useToast();
+  const { sessions: trainingSessions } = useTraining();
+  const { getPlanForPet } = useTrainingPlan();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [formState, setFormState] = useState({
@@ -136,6 +141,22 @@ export const CalendarPage = () => {
     }
     return streak;
   }, [trainingActivities]);
+  const dayTrainingSessions = useMemo(
+    () =>
+      trainingSessions
+        .filter((session) => session.petId === selectedPetId)
+        .filter((session) => sameDay(session.dateTimeISO, selectedDate))
+        .sort((a, b) => new Date(a.dateTimeISO).getTime() - new Date(b.dateTimeISO).getTime()),
+    [selectedPetId, selectedDate, trainingSessions],
+  );
+  const trainingPlanInfo = useMemo(
+    () => (selectedPetId ? getPlanForPet(selectedPetId) : null),
+    [getPlanForPet, selectedPetId],
+  );
+  const planDay =
+    trainingPlanInfo?.plan && trainingPlanInfo.petState.startDateISO
+      ? getPlanDayForDate(trainingPlanInfo.plan, trainingPlanInfo.petState.startDateISO, selectedDate)
+      : null;
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -257,8 +278,9 @@ export const CalendarPage = () => {
   };
 
   return (
-    <PageLayout title="Calendar" subtitle="Plan your walks, vet visits, and reminders">
-      <div className="grid gap-4 lg:grid-cols-3">
+    <div data-tour="calendar-page">
+      <PageLayout title="Calendar" subtitle="Plan your walks, vet visits, and reminders">
+        <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2" padding="lg">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <button
@@ -347,6 +369,36 @@ export const CalendarPage = () => {
               </Link>
             </div>
             <div className="mt-4 space-y-3">
+              {planDay && trainingPlanInfo?.plan && (
+                <div className="rounded-2xl border border-brand-border bg-white/80 px-4 py-3 text-sm text-brand-primary">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Plan focus</p>
+                  <p className="mt-1 font-semibold text-brand-primary">
+                    🐾 {trainingPlanInfo.plan.title} (Day {planDay.day})
+                  </p>
+                  <div className="mt-2 space-y-1 text-xs text-text-secondary">
+                    {planDay.tasks.slice(0, 2).map((task) => (
+                      <p key={task.id}>• {task.title}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {dayTrainingSessions.length > 0 && (
+                <div className="space-y-2 rounded-2xl border border-brand-border bg-white/80 p-3 text-sm text-brand-primary">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Scheduled sessions</p>
+                  {dayTrainingSessions.map((session) => (
+                    <div key={session.id} className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-brand-primary">{session.title}</p>
+                        <p className="text-xs text-text-muted">{formatTime(session.dateTimeISO)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-text-secondary">
+                        {session.durationMin ? <TagChip>{session.durationMin} min</TagChip> : null}
+                        {session.distanceMi ? <TagChip>{session.distanceMi} mi</TagChip> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {dayTraining.length > 0 ? (
                 dayTraining.map((activity) => (
                   <div key={activity.id} className="flex items-center justify-between gap-3 rounded-2xl border border-brand-border bg-white/80 px-4 py-3 text-sm">
@@ -721,7 +773,8 @@ export const CalendarPage = () => {
             </div>
           </Card>
         </div>
-      </div>
-    </PageLayout>
+        </div>
+      </PageLayout>
+    </div>
   );
 };

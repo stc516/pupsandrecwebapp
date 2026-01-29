@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 
 import {
   CalendarDays,
+  Dumbbell,
   Home,
   MapPin,
   NotebookPen,
@@ -22,6 +23,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { label: 'Home', path: '/', icon: Home },
   ...(features.exploreEnabled ? [{ label: 'Explore', path: '/explore', icon: MapPin }] : []),
+  { label: 'Training', path: '/training', icon: Dumbbell },
   { label: 'Activity', path: '/activity', icon: Activity },
   { label: 'Journal', path: '/journal', icon: NotebookPen },
   { label: 'Calendar', path: '/calendar', icon: CalendarDays },

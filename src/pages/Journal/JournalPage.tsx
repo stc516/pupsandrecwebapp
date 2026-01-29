@@ -334,11 +334,12 @@ export const JournalPage = () => {
   const journalingStreak = calculateLongestStreak(entriesForInsights);
 
   return (
-    <PageLayout
-      title="Journal"
-      subtitle="Capture the moments that make the day special."
-    >
-      <div className="space-y-6">
+    <div data-tour="journal-page">
+      <PageLayout
+        title="Journal"
+        subtitle="Capture the moments that make the day special."
+      >
+        <div className="space-y-6">
         <Card padding="lg" className="bg-gradient-to-br from-brand-subtle to-white">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-2">
@@ -486,8 +487,9 @@ export const JournalPage = () => {
             )}
           </div>
         </div>
-      </div>
-    </PageLayout>
+        </div>
+      </PageLayout>
+    </div>
   );
 };
 

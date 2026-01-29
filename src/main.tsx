@@ -10,6 +10,8 @@ import { ToastProvider } from './components/ui/ToastProvider';
 import { AuthProvider } from './context/AuthContext';
 import { AppStateProvider } from './context/AppStateContext';
 import { OnboardingProvider } from './context/OnboardingContext';
+import { TrainingProvider } from './context/TrainingContext';
+import { TrainingPlanProvider } from './context/TrainingPlanContext';
 import { ActivityPage } from './pages/Activity/ActivityPage';
 import LoginPage from './pages/Auth/LoginPage';
 import SignupPage from './pages/Auth/SignupPage';
@@ -24,6 +26,7 @@ import { PetsPage } from './pages/Pets/PetsPage';
 import { SettingsPage } from './pages/Settings/SettingsPage';
 import { HealthPage } from './pages/Health/HealthPage';
 import { ExplorePage } from './pages/Explore/ExplorePage';
+import { TrainingPage } from './pages/Training/TrainingPage';
 import { features } from './config/features';
 
 registerSW({ immediate: true });
@@ -46,6 +49,7 @@ const router = createBrowserRouter([
       ...(features.exploreEnabled ? [{ path: 'explore', element: <ExplorePage /> }] : []),
       { path: 'activity', element: <ActivityPage /> },
       { path: 'journal', element: <JournalPage /> },
+      { path: 'training', element: <TrainingPage /> },
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'feed', element: <FeedPage /> },
       { path: 'pets', element: <PetsPage /> },
@@ -59,11 +63,15 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
       <AppStateProvider>
-        <OnboardingProvider>
-          <ToastProvider>
-            <RouterProvider router={router} />
-          </ToastProvider>
-        </OnboardingProvider>
+        <TrainingProvider>
+          <TrainingPlanProvider>
+            <OnboardingProvider>
+              <ToastProvider>
+                <RouterProvider router={router} />
+              </ToastProvider>
+            </OnboardingProvider>
+          </TrainingPlanProvider>
+        </TrainingProvider>
       </AppStateProvider>
     </AuthProvider>
   </StrictMode>,

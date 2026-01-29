@@ -10,6 +10,8 @@ import { useAppState } from '../../hooks/useAppState';
 import { formatDate, formatTime, sameDay } from '../../utils/dates';
 import { PetAvatar } from '../../components/ui/PetAvatar';
 import { useOnboarding } from '../../context/OnboardingContext';
+import { useTrainingPlan } from '../../context/TrainingPlanContext';
+import { getPlanDayForDate, getPlanDayNumberForDate } from '../../components/training/trainingPlanSelectors';
 
 const quickActions = [
   { label: 'Start Walk', icon: <MapPinned size={16} />, to: '/activity' },
@@ -20,6 +22,7 @@ const quickActions = [
 export const HomePage = () => {
   const { selectedPet, activities, journalEntries, reminders, xp } = useAppState();
   const { state: onboarding, startTour, closeTour, setChecklist, resetOnboarding } = useOnboarding();
+  const { getPlanForPet } = useTrainingPlan();
   const petName = selectedPet?.name ?? 'your pup';
   const petAvatar = selectedPet?.avatarUrl ?? '';
   const petActivities = activities.filter((activity) => activity.petId === selectedPet?.id);
@@ -76,6 +79,21 @@ export const HomePage = () => {
   }, [trainingActivities]);
   const weeklyGoal = 3;
   const weeklyProgress = Math.min(1, trainingWeekSummary.dayCount / weeklyGoal);
+
+  const trainingPlanInfo = useMemo(
+    () => (selectedPet?.id ? getPlanForPet(selectedPet.id) : null),
+    [getPlanForPet, selectedPet?.id],
+  );
+  const activePlan = trainingPlanInfo?.plan ?? null;
+  const planState = trainingPlanInfo?.petState ?? null;
+  const todayPlanDay = activePlan && planState?.startDateISO
+    ? getPlanDayForDate(activePlan, planState.startDateISO, new Date())
+    : null;
+  const todayPlanDayNumber = activePlan && planState?.startDateISO
+    ? getPlanDayNumberForDate(activePlan, planState.startDateISO, new Date())
+    : null;
+  const planProgressRatio =
+    activePlan && planState ? Math.min(1, planState.completedDayNumbers.length / activePlan.durationDays) : 0;
 
   const checklist = {
     petAdded: Boolean(selectedPet?.id),
@@ -196,6 +214,64 @@ export const HomePage = () => {
             </div>
           </div>
         </div>
+      </Card>
+
+      <Card padding="lg" className="border border-brand-border bg-white/90">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Training plan</p>
+            {activePlan ? (
+              <>
+                <h3 className="mt-1 text-lg font-semibold text-brand-primary">{activePlan.title}</h3>
+                <p className="text-xs text-text-muted">
+                  Day {todayPlanDayNumber ?? 1} of {activePlan.durationDays}
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="mt-1 text-lg font-semibold text-brand-primary">No plan yet</h3>
+                <p className="text-xs text-text-secondary">
+                  Start a plan to build consistency with {petName}.
+                </p>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/training"
+              className="inline-flex items-center justify-center rounded-full bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-primary/90"
+            >
+              {activePlan ? 'Continue training' : 'Browse plans'}
+            </Link>
+            {activePlan && (
+              <Link to="/training" className="text-sm font-semibold text-brand-primary hover:underline">
+                View plan
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {activePlan && (
+          <>
+            <div className="mt-4 h-2 w-full rounded-full bg-brand-border">
+              <div
+                className="h-full rounded-full bg-brand-accent transition-all"
+                style={{ width: `${Math.round(planProgressRatio * 100)}%` }}
+              />
+            </div>
+            <div className="mt-4 space-y-2 text-sm text-text-secondary">
+              {todayPlanDay?.tasks.slice(0, 2).map((task) => (
+                <div key={task.id} className="flex items-center gap-2">
+                  <span className="text-brand-accent">•</span>
+                  <span>{task.title}</span>
+                </div>
+              ))}
+              {!todayPlanDay && (
+                <p className="text-xs text-text-muted">No tasks scheduled for today.</p>
+              )}
+            </div>
+          </>
+        )}
       </Card>
 
       <Card data-tour="home-today" padding="lg" className="border border-brand-accent/15 bg-gradient-to-br from-brand-subtle to-white shadow-lg">
