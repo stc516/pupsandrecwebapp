@@ -31,7 +31,7 @@ export const ActivityPage = () => {
   const { pushToast } = useToast();
   const [formState, setFormState] = useState({
     petId: selectedPetId,
-    type: 'walk' as ActivityTypeOption,
+    type: 'training' as ActivityTypeOption,
     date: new Date().toISOString().slice(0, 16),
     durationMinutes: 30,
     distanceKm: 3,
@@ -202,7 +202,10 @@ export const ActivityPage = () => {
       });
       setFormState((prev) => ({ ...prev, notes: '', photoUrl: '' }));
       setErrors({});
-      pushToast({ tone: 'success', message: 'Activity saved.' });
+      pushToast({
+        tone: 'success',
+        message: formState.type === 'training' ? 'Training logged — nice work!' : 'Activity saved.',
+      });
     } catch (error) {
       pushToast({
         tone: 'error',

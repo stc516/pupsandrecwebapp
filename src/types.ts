@@ -51,8 +51,8 @@ export interface Reminder {
   dateTime: string; // ISO
   recurrence?: {
     frequency: 'none' | 'daily' | 'weekly' | 'monthly';
-    interval?: number; // every N periods
-    until?: string; // ISO end date
+    interval?: number;
+    until?: string;
   };
 }
 
@@ -95,6 +95,22 @@ export interface PlanTask {
   category: 'obedience' | 'leash' | 'socialization' | 'tricks' | 'focus';
   proofing?: string[];
   notes?: string;
+}
+
+export type ExploreCategory = 'dog_parks' | 'trails' | 'parks';
+
+export interface ExplorePlace {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  address: string;
+  rating?: number;
+  userRatingsTotal?: number;
+  types: string[];
+  googleMapsUrl: string;
+  distanceMeters?: number;
+  categories?: ExploreCategory[];
 }
 
 export type AchievementCondition =
