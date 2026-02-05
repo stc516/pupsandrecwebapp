@@ -7,7 +7,7 @@ import { PageLayout } from '../../layouts/PageLayout';
 import { CategoryFilters, allExploreCategories } from '../../components/explore/CategoryFilters';
 import { PlaceCard } from '../../components/explore/PlaceCard';
 import { PlaceDetailsPanel } from '../../components/explore/PlaceDetailsPanel';
-import { fetchNearbyPlaces, geocodeLocation, loadGoogleMaps } from '../../lib/places';
+import { fetchDogPlaces, geocodeLocation, loadGoogleMaps } from '../../lib/places';
 import type { ExploreCategory, ExplorePlace } from '../../types';
 
 type LatLng = { lat: number; lng: number };
@@ -44,6 +44,12 @@ export const ExplorePage = () => {
 
   useEffect(() => {
     if (!apiKey) return;
+    const maskedKey = apiKey.length > 8 ? `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}` : 'set';
+    if (import.meta.env.DEV) {
+      // Temporary diagnostics for Google Maps key presence.
+      // eslint-disable-next-line no-console
+      console.info(`[Explore] Maps key present=${Boolean(apiKey)} key=${maskedKey}`);
+    }
     loadGoogleMaps()
       .then((googleMaps) => {
         googleRef.current = googleMaps;
@@ -155,7 +161,7 @@ export const ExplorePage = () => {
   }, [places, updateMarkers]);
 
   const fetchPlaces = useCallback(
-    async (nextCenter: LatLng, reason: 'initial' | 'refresh' | 'filters') => {
+    async (nextCenter: LatLng, reason: 'initial' | 'refresh' | 'filters', query?: string) => {
       if (filters.length === 0) {
         setPlaces([]);
         setSelectedPlaceId(null);
@@ -167,11 +173,12 @@ export const ExplorePage = () => {
       setIsFetching(true);
       setFetchError(null);
       try {
-        const results = await fetchNearbyPlaces({
+        const results = await fetchDogPlaces({
           lat: nextCenter.lat,
           lng: nextCenter.lng,
           radiusMeters: DEFAULT_RADIUS_METERS,
-          includedTypes: filters,
+          categories: filters,
+          query,
         });
         if (requestId !== fetchIdRef.current) return;
         const limited = results.slice(0, MAX_RESULTS);
@@ -202,13 +209,13 @@ export const ExplorePage = () => {
     }
     const reason: 'initial' | 'filters' = hasFetchedRef.current ? 'filters' : 'initial';
     debounceRef.current = window.setTimeout(() => {
-      void fetchPlaces(center, reason);
+      void fetchPlaces(center, reason, manualQuery.trim());
     }, 350);
     hasFetchedRef.current = true;
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
-  }, [center, fetchPlaces, filters]);
+  }, [center, fetchPlaces, filters, manualQuery]);
 
   useEffect(() => {
     if (!selectedPlace || !mapRef.current) return;
@@ -220,25 +227,34 @@ export const ExplorePage = () => {
     const nextCenter = mapCenter ? { lat: mapCenter.lat(), lng: mapCenter.lng() } : center;
     if (!nextCenter) return;
     setCenter(nextCenter);
-    void fetchPlaces(nextCenter, 'refresh');
+    void fetchPlaces(nextCenter, 'refresh', manualQuery.trim());
   };
 
   const handleManualSearch = async () => {
-    if (!manualQuery.trim()) return;
+    const rawQuery = manualQuery.trim();
+    if (!rawQuery && !center) return;
     setIsGeocoding(true);
     setFetchError(null);
-    try {
-      const result = await geocodeLocation(manualQuery.trim());
-      const nextCenter = { lat: result.lat, lng: result.lng };
-      setCenter(nextCenter);
-      setLocationStatus('ready');
-      setLocationError(null);
-      void fetchPlaces(nextCenter, 'initial');
-    } catch (error) {
-      setFetchError(error instanceof Error ? error.message : 'Unable to find that location.');
-    } finally {
-      setIsGeocoding(false);
+    let nextCenter = center;
+    if (rawQuery) {
+      try {
+        const result = await geocodeLocation(rawQuery);
+        nextCenter = { lat: result.lat, lng: result.lng };
+        setCenter(nextCenter);
+        setLocationStatus('ready');
+        setLocationError(null);
+      } catch (error) {
+        if (!center) {
+          setFetchError(error instanceof Error ? error.message : 'Unable to find that location.');
+          setIsGeocoding(false);
+          return;
+        }
+      }
     }
+    if (nextCenter) {
+      void fetchPlaces(nextCenter, 'initial', rawQuery);
+    }
+    setIsGeocoding(false);
   };
 
   if (!apiKey) {
@@ -268,6 +284,38 @@ export const ExplorePage = () => {
         <div className="flex flex-col gap-4">
           <Card padding="lg">
             <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Search area</p>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    value={manualQuery}
+                    onChange={(event) => setManualQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        void handleManualSearch();
+                      }
+                    }}
+                    placeholder="Search dog parks, beaches, trails…"
+                    className="flex-1 rounded-xl border border-brand-border px-3 py-2 text-sm text-brand-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-accent"
+                  />
+                  <PrimaryButton
+                    type="button"
+                    onClick={handleManualSearch}
+                    disabled={isGeocoding}
+                    startIcon={<Search size={14} />}
+                  >
+                    Search
+                  </PrimaryButton>
+                </div>
+                {locationError && (
+                  <p className="flex items-center gap-2 text-xs font-semibold text-brand-primary">
+                    <AlertTriangle size={14} />
+                    {locationError}
+                  </p>
+                )}
+              </div>
+
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-primary/70">Filters</p>
@@ -283,30 +331,9 @@ export const ExplorePage = () => {
                 </SecondaryButton>
               </div>
               <CategoryFilters selected={filters} onToggle={toggleFilter} />
-              {(locationStatus === 'denied' || locationStatus === 'error') && (
-                <div className="space-y-2 rounded-2xl border border-brand-border bg-white/80 p-3 text-sm text-text-secondary">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-brand-primary">
-                    <AlertTriangle size={16} />
-                    {locationError ?? 'Location is unavailable.'}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <input
-                      value={manualQuery}
-                      onChange={(event) => setManualQuery(event.target.value)}
-                      placeholder="Enter city or zip"
-                      className="flex-1 rounded-xl border border-brand-border px-3 py-2 text-sm text-brand-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-accent"
-                    />
-                    <PrimaryButton
-                      type="button"
-                      onClick={handleManualSearch}
-                      disabled={isGeocoding}
-                      startIcon={<Search size={14} />}
-                    >
-                      Search
-                    </PrimaryButton>
-                  </div>
-                </div>
-              )}
+              <p className="text-xs text-text-secondary">
+                Leash rules vary—tap a place to check signage or official rules.
+              </p>
               {locationStatus === 'loading' && (
                 <div className="rounded-2xl border border-brand-border bg-white/80 px-3 py-2 text-xs text-text-secondary">
                   Finding your location…

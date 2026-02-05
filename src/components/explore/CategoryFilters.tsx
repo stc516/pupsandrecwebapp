@@ -1,10 +1,10 @@
 import clsx from 'clsx';
 import type { ExploreCategory } from '../../types';
 
-const categoryOptions: Array<{ id: ExploreCategory; label: string }> = [
-  { id: 'dog_parks', label: 'Dog Parks' },
-  { id: 'trails', label: 'Trails' },
-  { id: 'parks', label: 'Parks' },
+const categoryOptions: Array<{ id: ExploreCategory; filterLabel: string; resultLabel: string }> = [
+  { id: 'dog_parks', filterLabel: 'Dog Parks', resultLabel: 'Dog Park (Verified)' },
+  { id: 'trails', filterLabel: 'Trails & Open Space', resultLabel: 'Trail/Open Space (Likely)' },
+  { id: 'parks', filterLabel: 'Parks', resultLabel: 'Park (General)' },
 ];
 
 export const CategoryFilters = ({
@@ -29,7 +29,7 @@ export const CategoryFilters = ({
               : 'border border-brand-border bg-white text-brand-primary hover:border-brand-accent',
           )}
         >
-          {category.label}
+          {category.filterLabel}
         </button>
       );
     })}
@@ -38,4 +38,4 @@ export const CategoryFilters = ({
 
 export const allExploreCategories = categoryOptions.map((category) => category.id);
 export const exploreCategoryLabel = (category: ExploreCategory) =>
-  categoryOptions.find((item) => item.id === category)?.label ?? category;
+  categoryOptions.find((item) => item.id === category)?.resultLabel ?? category;
